@@ -59,7 +59,10 @@ export function InterviewPage({ sessionId }: Props) {
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pttKeyDownAtRef = useRef<number>(0);
+  const pttMicWasOnRef = useRef<boolean>(false);
   const voiceSupported = isSpeechSupported();
+  const PTT_TAP_MS = 130;
 
   const total = initialQueue.length;
   const current = initialQueue[currentIndex];
@@ -216,6 +219,83 @@ export function InterviewPage({ sessionId }: Props) {
   useEffect(() => {
     return () => stopAll();
   }, []);
+
+  // Space-key mic control: tap to toggle, hold for push-to-talk.
+  // Mirrors the standalone voice-agent UI behavior — short press flips
+  // dictation on/off; long press keeps the mic open while held.
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return true;
+      if (target.isContentEditable) return true;
+      return false;
+    };
+
+    const canToggleMic = (): boolean => {
+      // Don't try to drive the mic during phases where it isn't meaningful.
+      if (!current) return false;
+      if (phase === "done" || phase === "processing" || phase === "confirming") {
+        return false;
+      }
+      return true;
+    };
+
+    const startMic = () => {
+      if (!canToggleMic()) return;
+      if (cleanupRef.current) return; // already listening
+      beginListening(current);
+    };
+
+    const stopMic = () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      setInterim("");
+      // Drop back to idle so the orb stops pulsing as "listening".
+      if (phase === "listening") setPhase("idle");
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (pttKeyDownAtRef.current !== 0) return;
+      pttKeyDownAtRef.current = Date.now();
+      pttMicWasOnRef.current = !!cleanupRef.current;
+      // Open mic immediately so hold-to-talk feels instant. A tap that
+      // happened with the mic already on is reconciled on keyup.
+      if (!cleanupRef.current) startMic();
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      if (pttKeyDownAtRef.current === 0) return;
+      const elapsed = Date.now() - pttKeyDownAtRef.current;
+      const wasOnBefore = pttMicWasOnRef.current;
+      pttKeyDownAtRef.current = 0;
+      pttMicWasOnRef.current = false;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (elapsed < PTT_TAP_MS) {
+        // Tap — toggle relative to the pre-press state.
+        if (wasOnBefore) {
+          stopMic();
+        }
+        // else: keydown already started the mic; leave it on.
+      } else {
+        // Hold release — classic PTT, close the mic.
+        stopMic();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, current]);
 
   // Empty queue (nothing was open when the route loaded)
   if (total === 0) {
