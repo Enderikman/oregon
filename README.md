@@ -4,6 +4,8 @@
   <img src="assets/diagram.png" alt="Oregon architecture — sources → entity decomposition → knowledge graph → hybrid search → answer" width="100%"/>
 </p>
 
+### Solving context fragmentation
+
 Every organization has the same problem: the answer to any business question is scattered across a dozen systems — HR platforms, emails, CRMs, chat logs, ticketing tools, code repos, policy docs. Asking "What's the status on client X?" shouldn't require knowing which of 15 data sources to check, how to join records across them, or which conversation from last week overrides the one from last month.
 
 The real world makes this worse. There's no shared schema. People are referenced by name in emails but by ID in the CRM. A client status change lives in a Slack message, not the database. And some questions simply can't be answered from the data — the system should know that too, and tell you who to ask instead.
