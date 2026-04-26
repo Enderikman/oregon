@@ -1,40 +1,313 @@
+// Speech bridge — talks to the voice-agent backend instead of the browser's
+// Web Speech API. Set `VITE_VOICE_AGENT_URL` in `.env` (e.g.
+// `http://localhost:8001`) — the agent exposes `/api/tts` (HTTP POST → wav)
+// and `/api/stt` (WebSocket bridge). There is NO Web Speech fallback;
+// without the service, dictation/synthesis surface a clear console error
+// and become no-ops.
+
+import { createMicWorkletUrl } from "./audio-worklet";
+
 type DictationCleanup = () => void;
 
-export function isSpeechSupported(): boolean {
-  if (typeof window === "undefined") return false;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w = window as any;
-  return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition);
+interface DictationOptions {
+  language?: string;
+  /** Called when the bridge fails to connect — message is human-readable. */
+  onError?: (message: string) => void;
 }
 
+interface SpeakOptions {
+  language?: string;
+  voiceId?: string | null;
+  /** Optional `<audio>` element to render through; one is created otherwise. */
+  audioEl?: HTMLAudioElement;
+}
+
+const TARGET_SAMPLE_RATE = 24_000;
+const FRAME_SAMPLES = 960; // 40 ms at 24 kHz, slightly under Gradium's 80 ms ceiling
+
+function getServiceUrl(): string | null {
+  if (typeof import.meta === "undefined") return null;
+  const url = import.meta.env?.VITE_VOICE_AGENT_URL;
+  if (!url || typeof url !== "string") return null;
+  return url.replace(/\/$/, "");
+}
+
+function logMissingService(scope: string): void {
+  console.error(
+    `[speech.${scope}] VITE_VOICE_AGENT_URL is not set — voice features are disabled. ` +
+      "Add VITE_VOICE_AGENT_URL=http://localhost:8001 to .env and restart the dev server.",
+  );
+}
+
+/**
+ * Returns true when the browser has the APIs needed to capture mic audio
+ * AND a voice-agent URL is configured. Components use this as a feature
+ * flag to swap in tap-only fallback UI (candidate buttons, manual input).
+ */
+export function isSpeechSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!getServiceUrl()) return false;
+  const w = window as unknown as {
+    AudioContext?: unknown;
+    webkitAudioContext?: unknown;
+    MediaRecorder?: unknown;
+  };
+  const hasAudio = Boolean(w.AudioContext || w.webkitAudioContext);
+  const hasMedia = Boolean(navigator?.mediaDevices?.getUserMedia);
+  return hasAudio && hasMedia;
+}
+
+/**
+ * Speak text via Gradium TTS through the voice-agent bridge. Returns a
+ * Promise that resolves on `ended` (or rejects on error). NOT currently
+ * imported by the existing UI — it speaks via `window.speechSynthesis` —
+ * but exported so future callers can route TTS through the bridge too.
+ */
+export async function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+  if (typeof window === "undefined") return;
+  const base = getServiceUrl();
+  if (!base) {
+    logMissingService("speak");
+    throw new Error("voice-agent URL not configured");
+  }
+  if (!text.trim()) return;
+
+  const res = await fetch(`${base}/api/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      language: opts.language ?? "en",
+      voice_id: opts.voiceId ?? null,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`tts request failed: HTTP ${res.status} ${detail.slice(0, 200)}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  return new Promise<void>((resolve, reject) => {
+    const audio = opts.audioEl ?? new Audio();
+    const cleanup = () => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        /* ignore */
+      }
+    };
+    audio.onended = () => {
+      cleanup();
+      resolve();
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error("tts audio playback failed"));
+    };
+    audio.src = url;
+    audio.play().catch((err) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    });
+  });
+}
+
+/**
+ * Start dictation by streaming mic audio to the voice-agent STT bridge.
+ *
+ * The signature mirrors the original Web-Speech-API version: an `onInterim`
+ * callback fires for each partial transcript chunk and `onFinal` fires for
+ * each finalized utterance. The returned cleanup function tears down the
+ * AudioWorklet, mic stream, and WebSocket.
+ */
 export function startDictation(
   onInterim: (text: string) => void,
   onFinal: (text: string) => void,
+  opts: DictationOptions = {},
 ): DictationCleanup {
   if (typeof window === "undefined") return () => {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w = window as any;
-  const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-  if (!Ctor) return () => {};
-  const rec = new Ctor();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.lang = "en-US";
+  const base = getServiceUrl();
+  if (!base) {
+    logMissingService("startDictation");
+    opts.onError?.("voice-agent URL not configured");
+    return () => {};
+  }
 
-  rec.onresult = (event: unknown) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const e = event as any;
-    let interim = "";
-    let final = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i];
-      if (r.isFinal) final += r[0].transcript;
-      else interim += r[0].transcript;
+  let stopped = false;
+  let cleanupAudio: (() => void) | null = null;
+  let socket: WebSocket | null = null;
+  let interimBuffer = "";
+
+  const wsUrl = `${base.replace(/^http/, "ws")}/api/stt`;
+
+  const teardown: DictationCleanup = () => {
+    if (stopped) return;
+    stopped = true;
+    try {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "end" }));
+      }
+    } catch {
+      /* ignore */
     }
-    if (interim) onInterim(interim);
-    if (final) onFinal(final);
+    try {
+      socket?.close();
+    } catch {
+      /* ignore */
+    }
+    socket = null;
+    cleanupAudio?.();
+    cleanupAudio = null;
   };
 
-  try { rec.start(); } catch { /* ignore */ }
-  return () => { try { rec.stop(); } catch { /* ignore */ } };
+  (async () => {
+    try {
+      socket = new WebSocket(wsUrl);
+      socket.binaryType = "arraybuffer";
+
+      const opened = new Promise<void>((resolve, reject) => {
+        if (!socket) return reject(new Error("socket gone"));
+        socket.onopen = () => resolve();
+        socket.onerror = () => reject(new Error("stt websocket error"));
+      });
+
+      socket.onmessage = (ev) => {
+        if (typeof ev.data !== "string") return;
+        let msg: { type?: string; text?: string; final?: boolean; message?: string };
+        try {
+          msg = JSON.parse(ev.data);
+        } catch {
+          return;
+        }
+        if (msg.type === "transcript") {
+          const text = msg.text ?? "";
+          if (msg.final) {
+            const finalText = (interimBuffer + text).trim();
+            interimBuffer = "";
+            if (finalText) onFinal(finalText);
+          } else if (text) {
+            interimBuffer = `${interimBuffer}${text}`.replace(/\s+/g, " ").trimStart();
+            onInterim(interimBuffer);
+          }
+        } else if (msg.type === "error") {
+          console.error("[speech.startDictation] bridge error:", msg.message);
+          opts.onError?.(msg.message ?? "speech bridge error");
+          teardown();
+        }
+      };
+
+      socket.onclose = () => {
+        // If we still have buffered interim text on close, promote it.
+        const pending = interimBuffer.trim();
+        interimBuffer = "";
+        if (pending) onFinal(pending);
+      };
+
+      await opened;
+      if (stopped || !socket) return;
+
+      socket.send(JSON.stringify({ type: "setup", language: opts.language ?? "en" }));
+
+      // Start mic capture only after the socket is open.
+      cleanupAudio = await startMicPipeline((pcm) => {
+        if (stopped || !socket || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(pcm);
+      });
+
+      if (stopped) cleanupAudio?.();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[speech.startDictation] setup failed:", msg);
+      opts.onError?.(msg);
+      teardown();
+    }
+  })();
+
+  return teardown;
+}
+
+// ---------------------------------------------------------------------------
+// Mic capture pipeline: getUserMedia → AudioWorklet → 24 kHz PCM16 frames
+// ---------------------------------------------------------------------------
+
+type SendPcm = (frame: ArrayBuffer) => void;
+
+async function startMicPipeline(send: SendPcm): Promise<() => void> {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  });
+
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new AudioCtx();
+
+  const workletUrl = createMicWorkletUrl({
+    targetSampleRate: TARGET_SAMPLE_RATE,
+    frameSamples: FRAME_SAMPLES,
+  });
+
+  try {
+    await ctx.audioWorklet.addModule(workletUrl);
+  } finally {
+    URL.revokeObjectURL(workletUrl);
+  }
+
+  const source = ctx.createMediaStreamSource(stream);
+  const node = new AudioWorkletNode(ctx, "mic-downsampler", {
+    processorOptions: {
+      sourceSampleRate: ctx.sampleRate,
+      targetSampleRate: TARGET_SAMPLE_RATE,
+      frameSamples: FRAME_SAMPLES,
+    },
+  });
+
+  node.port.onmessage = (ev: MessageEvent<ArrayBuffer>) => {
+    if (ev.data instanceof ArrayBuffer) send(ev.data);
+  };
+
+  source.connect(node);
+  // Worklets don't need to be connected to destination, but Safari sometimes
+  // refuses to start the audio graph otherwise. Use a muted sink.
+  const sink = ctx.createGain();
+  sink.gain.value = 0;
+  node.connect(sink);
+  sink.connect(ctx.destination);
+
+  return () => {
+    try {
+      node.port.onmessage = null;
+      node.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      source.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      sink.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      ctx.close();
+    } catch {
+      /* ignore */
+    }
+    for (const track of stream.getTracks()) {
+      try {
+        track.stop();
+      } catch {
+        /* ignore */
+      }
+    }
+  };
 }
