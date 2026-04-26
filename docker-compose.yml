@@ -18,6 +18,20 @@ services:
     networks:
       - oregon-net
 
+  voice-agent:
+    build:
+      context: ./backend
+    container_name: oregon-voice-agent
+    command: ["python3", "-m", "uvicorn", "src.voice_agent.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+    environment:
+      - GRADIUM_API_KEY=${GRADIUM_API_KEY:-}
+      - GRADIUM_VOICE_ID=${GRADIUM_VOICE_ID:-}
+      - GRADIUM_MODEL=${GRADIUM_MODEL:-default}
+    networks:
+      - oregon-net
+
   frontend:
     build:
       context: ./frontend
@@ -28,8 +42,10 @@ services:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3000}
       - VITE_OPENROUTER_API_KEY=${VITE_OPENROUTER_API_KEY:-}
       - VITE_OPENROUTER_MODEL=${VITE_OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      - VITE_VOICE_AGENT_URL=${VITE_VOICE_AGENT_URL:-http://localhost:8001}
     depends_on:
       - backend
+      - voice-agent
     networks:
       - oregon-net
 
