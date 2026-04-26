@@ -1,4 +1,4 @@
-# Oregon
+# ⚛ Oregon
 
 <p align="center">
   <img src="assets/diagram.png" alt="Oregon architecture — sources → entity decomposition → knowledge graph → hybrid search → answer" width="100%"/>
