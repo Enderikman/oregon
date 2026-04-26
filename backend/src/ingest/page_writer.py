@@ -4,7 +4,7 @@ from textwrap import dedent
 from .models import EntityRecord
 from .entity_index import EntityIndex
 from .reverse_index import update_reverse_index
-from v1 import llm
+from src import llm
 
 
 SYSTEM_PROMPT = dedent("""\

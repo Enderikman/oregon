@@ -7,8 +7,8 @@ from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from v1.query.main import query as run_query
-from v1.ingest.reverse_index import WIKILINK_PATTERN
+from src.query.main import query as run_query
+from src.ingest.reverse_index import WIKILINK_PATTERN
 
 app = FastAPI(title="Oregon API")
 app.add_middleware(
@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 OUTPUT_DIR = Path("output/EnterpriseBench")
-ONTOLOGY_PATH = "src/v1/ingest/ontology.yaml"
+ONTOLOGY_PATH = "src/ingest/ontology.yaml"
 
 # ── Chat ────────────────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ import shutil
 import tempfile
 import zipfile
 
-from v1.ingest.main import run as run_ingest
+from src.ingest.main import run as run_ingest
 
 
 class IngestResponse(BaseModel):
@@ -176,7 +176,7 @@ def ingest_dataset(file: UploadFile):
     shutil.rmtree(tmp, ignore_errors=True)
     return IngestResponse(
         datasetId=dataset_id,
-        mapperPath=f"src/v1/ingest/mappers/{dataset_id.lower()}.yaml",
+        mapperPath=f"src/ingest/mappers/{dataset_id.lower()}.yaml",
         outputDir=output_dir,
     )
 

@@ -15,12 +15,12 @@ Humans teach the system through swipe quizzes and voice interviews. Admins inspe
 ## Quickstart
 
 ```bash
-cd project
-bun install
-bun run dev        # → http://localhost:8080
-```
+# frontend only
+cd frontend && bun install && bun run dev   # → http://localhost:8080
 
-Set `VITE_API_BASE_URL` in `project/.env` to connect a real backend (optional).
+# full stack (backend + frontend)
+./dev.sh                                    # → backend :8000, frontend :8080
+```
 
 ---
 

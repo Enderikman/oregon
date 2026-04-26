@@ -6,7 +6,7 @@ from pathlib import Path
 
 import sqlite_vec
 
-from v1 import llm
+from src import llm
 
 
 @dataclass

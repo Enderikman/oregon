@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from v1 import llm
+from src import llm
 
 ONTOLOGY_PATH = Path(__file__).parent / "ontology.yaml"
 EXAMPLE_MAPPER_PATH = Path(__file__).parent / "mappers" / "enterprisebench.yaml"

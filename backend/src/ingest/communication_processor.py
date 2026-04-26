@@ -7,7 +7,7 @@ from textwrap import dedent
 from .models import CommunicationRecord
 from .entity_index import EntityIndex
 from .reverse_index import update_reverse_index
-from v1 import llm
+from src import llm
 
 
 def _comm_hash(comm: CommunicationRecord) -> str:

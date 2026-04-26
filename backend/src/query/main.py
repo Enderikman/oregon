@@ -4,9 +4,9 @@ from textwrap import dedent
 
 from pydantic import BaseModel
 
-from v1 import llm
-from v1.query.entity_detector import EntityDetector
-from v1.query.search import PageIndex
+from src import llm
+from src.query.entity_detector import EntityDetector
+from src.query.search import PageIndex
 
 
 MAX_HOPS = 5

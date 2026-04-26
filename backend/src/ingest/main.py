@@ -8,7 +8,7 @@ from .entity_index import EntityIndex
 from .page_writer import write_page
 from .reverse_index import update_reverse_index
 from .communication_processor import process_communication, CommCheckpoint
-from v1.query.search import PageIndex
+from src.query.search import PageIndex
 
 
 def run(dataset_path: str, output_dir: str | None = None, max_workers: int = 500, mapper_path: str | None = None, just_vectors: bool = False):

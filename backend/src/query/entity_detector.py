@@ -7,7 +7,7 @@ from textwrap import dedent
 import yaml
 from pydantic import BaseModel
 
-from v1 import llm
+from src import llm
 
 
 class Confidence(str, Enum):
