@@ -13,6 +13,14 @@ interface DictationOptions {
   language?: string;
   /** Called when the bridge fails to connect — message is human-readable. */
   onError?: (message: string) => void;
+  /**
+   * Seconds of silence after the last transcript chunk before the bridge
+   * promotes the accumulated text to a final transcript. Default 2.5s.
+   * Lower values feel more responsive but cut off pauses; higher values
+   * are forgiving but delay the final callback. Forwarded to the server's
+   * `/api/stt` setup message.
+   */
+  silenceThresholdSec?: number;
 }
 
 interface SpeakOptions {
@@ -181,13 +189,19 @@ export function startDictation(
           return;
         }
         if (msg.type === "transcript") {
+          // The bridge emits the FULL accumulated transcript on every
+          // `text` event — `text` is the running utterance, not a new
+          // chunk to append. So we replace `interimBuffer` rather than
+          // concatenate. `final:true` means "user has stopped speaking
+          // (silence threshold elapsed or end signal received)" — the
+          // text on that frame is the complete utterance.
           const text = msg.text ?? "";
           if (msg.final) {
-            const finalText = (interimBuffer + text).trim();
+            const finalText = (text || interimBuffer).trim();
             interimBuffer = "";
             if (finalText) onFinal(finalText);
           } else if (text) {
-            interimBuffer = `${interimBuffer}${text}`.replace(/\s+/g, " ").trimStart();
+            interimBuffer = text.replace(/\s+/g, " ").trimStart();
             onInterim(interimBuffer);
           }
         } else if (msg.type === "error") {
@@ -207,7 +221,13 @@ export function startDictation(
       await opened;
       if (stopped || !socket) return;
 
-      socket.send(JSON.stringify({ type: "setup", language: opts.language ?? "en" }));
+      socket.send(
+        JSON.stringify({
+          type: "setup",
+          language: opts.language ?? "en",
+          silence_threshold_s: opts.silenceThresholdSec ?? 2.5,
+        }),
+      );
 
       // Start mic capture only after the socket is open.
       cleanupAudio = await startMicPipeline((pcm) => {
