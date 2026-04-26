@@ -24,6 +24,7 @@ Under the hood:
 ### Known limitations
 
 - **Partial time awareness** — the test corpus (EnterpriseBench) spans 2016–2022; in a production system, date-relative queries ("last quarter", "recently") would need grounding to the current date
+- **`caffeinate/` is an alternative approach** — a Rust-based context engine (entity/fact graph with conflict detection and hybrid search) we explored in parallel. Did not get it working end-to-end in time, so not wired into the main system. Kept in-tree for reference; see [`caffeinate/README.md`](caffeinate/README.md).
 
 ---
 
