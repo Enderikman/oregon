@@ -7,8 +7,8 @@ services:
       - "3000:3000"
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - EMBED_MODEL=${EMBED_MODEL:-gemini-embedding-001}
       - EMBED_ENDPOINT=${EMBED_ENDPOINT:-}
-      - EMBED_MODEL=${EMBED_MODEL:-}
       - INGEST_DATA_DIR=${INGEST_DATA_DIR:-/dataset/EnterpriseBench}
       - OUTPUT_DIR=${OUTPUT_DIR:-/data/EnterpriseBench}
       - INGEST_ON_STARTUP=${INGEST_ON_STARTUP:-true}
