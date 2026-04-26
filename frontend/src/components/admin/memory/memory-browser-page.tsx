@@ -1,53 +1,52 @@
-import { useMemo, useState } from "react";
-import { api } from "@/lib/api";
-import { useMemoryStore } from "@/lib/memory-context";
+import { useCallback, useEffect, useState } from "react";
+import { memoryApi, type MemoryTreeEntry, type MemoryPage } from "@/lib/api";
 import { EntityTree } from "./entity-tree";
 import { EntityDetail } from "./entity-detail";
-import { ProvenancePanel } from "./provenance-panel";
-import { InterviewTranscriptDrawer } from "./interview-transcript-drawer";
-
-type Focus = { kind: "source" | "interview"; id: string } | null;
+import { BacklinksPanel } from "./backlinks-panel";
 
 export function MemoryBrowserPage() {
-  const entities = useMemo(() => api.listEntities(), []);
-  const sources = useMemo(() => api.listSources(), []);
-  const { facts } = useMemoryStore();
+  const [tree, setTree] = useState<MemoryTreeEntry[]>([]);
+  const [page, setPage] = useState<MemoryPage | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [entityId, setEntityId] = useState<string>(entities[0]?.id ?? "acme-corp");
-  const [focus, setFocus] = useState<Focus>(null);
-  const [drawerInterviewId, setDrawerInterviewId] = useState<string | null>(null);
+  useEffect(() => {
+    memoryApi
+      .fetchTree()
+      .then((entries) => {
+        setTree(entries);
+        if (entries.length > 0) setSelectedId(entries[0].id);
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const entity = useMemo(
-    () => entities.find((e) => e.id === entityId) ?? entities[0],
-    [entities, entityId],
-  );
+  useEffect(() => {
+    if (!selectedId) return;
+    setPage(null);
+    memoryApi
+      .fetchPage(selectedId)
+      .then(setPage)
+      .catch((e) => setError(e.message));
+  }, [selectedId]);
 
-  const entityFacts = useMemo(
-    () => facts.filter((f) => entity?.factIds.includes(f.id)),
-    [facts, entity],
-  );
+  const handleSelectEntity = useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
 
-  const handleSelectEntity = (id: string) => {
-    setEntityId(id);
-    setFocus(null);
-  };
-
-  const handleFocusChange = (target: { kind: "source" | "interview"; id: string }) => {
-    setFocus(target);
-    if (target.kind === "interview") {
-      setDrawerInterviewId(target.id);
-    }
-  };
-
-  const handleOpenInterview = (id: string) => {
-    setDrawerInterviewId(id);
-    setFocus({ kind: "interview", id });
-  };
-
-  if (!entity) {
+  if (loading) {
     return (
       <main className="mx-auto max-w-[1200px] px-6 py-12 text-center text-ink-muted">
-        No entities loaded.
+        Loading entities...
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="mx-auto max-w-[1200px] px-6 py-12 text-center text-ink-muted">
+        <p>Error: {error}</p>
       </main>
     );
   }
@@ -60,48 +59,40 @@ export function MemoryBrowserPage() {
         </div>
         <h1 className="mt-1 text-[26px] font-normal text-ink">Memory browser</h1>
         <p className="mt-1 text-[13px] text-ink-muted">
-          Every fact traces back to a source — a record or a person.
+          Browse the knowledge graph — every entity links to related pages.
         </p>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_320px]">
         <div className="self-start lg:sticky lg:top-4">
           <div className="rounded-[14px] border border-border bg-surface p-3 shadow-soft">
-            <EntityTree entities={entities} selectedId={entity.id} onSelect={handleSelectEntity} />
+            <EntityTree
+              entries={tree}
+              selectedId={selectedId ?? ""}
+              onSelect={handleSelectEntity}
+            />
           </div>
         </div>
 
         <div>
-          <EntityDetail
-            entity={entity}
-            facts={entityFacts}
-            allEntities={entities}
-            focus={focus}
-            onFocusChange={handleFocusChange}
-            onSelectEntity={handleSelectEntity}
-          />
+          {page ? (
+            <EntityDetail page={page} onSelectEntity={handleSelectEntity} tree={tree} />
+          ) : (
+            <div className="rounded-[14px] border border-border bg-surface p-6 text-center text-[13px] text-ink-muted shadow-soft">
+              Select an entity to view its page.
+            </div>
+          )}
         </div>
 
         <div className="self-start lg:sticky lg:top-4">
-          <ProvenancePanel
-            entity={entity}
-            entityFacts={entityFacts}
-            sources={sources}
-            allEntities={entities}
-            focus={focus}
-            onSelectEntity={handleSelectEntity}
-            onOpenInterview={handleOpenInterview}
-          />
+          {page ? (
+            <BacklinksPanel
+              backlinks={page.backlinks}
+              onSelectEntity={handleSelectEntity}
+            />
+          ) : null}
         </div>
       </div>
-
-      <InterviewTranscriptDrawer
-        interviewId={drawerInterviewId}
-        open={Boolean(drawerInterviewId)}
-        onOpenChange={(o) => {
-          if (!o) setDrawerInterviewId(null);
-        }}
-      />
     </main>
   );
 }

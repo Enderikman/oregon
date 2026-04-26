@@ -112,6 +112,95 @@ def memory_chat(req: ChatRequest):
     return ChatResponse(conversationId=conv_id, reply=answer)
 
 
+# ── Memory browser ─────────────────────────────────────────────────────
+
+class MemoryTreeEntry(BaseModel):
+    id: str
+    type: str
+    name: str
+
+
+class MemoryBacklink(BaseModel):
+    id: str
+    type: str
+    name: str | None = None
+
+
+class MemoryPageResponse(BaseModel):
+    id: str
+    type: str
+    name: str
+    frontmatter: dict
+    body: str
+    backlinks: list[MemoryBacklink]
+
+
+@app.get("/api/v1/admin/memory/tree", response_model=list[MemoryTreeEntry])
+def memory_tree():
+    if not OUTPUT_DIR.exists():
+        raise HTTPException(404, "No ingested data found.")
+    entries: list[MemoryTreeEntry] = []
+    for type_dir in sorted(OUTPUT_DIR.iterdir()):
+        if not type_dir.is_dir() or type_dir.name.startswith("."):
+            continue
+        entity_type = type_dir.name
+        frontend_type = ENTITY_TYPE_MAP.get(entity_type, entity_type.lower())
+        for entity_dir in sorted(type_dir.iterdir()):
+            if not entity_dir.is_dir():
+                continue
+            page_path = entity_dir / "page.md"
+            if not page_path.exists():
+                continue
+            content = page_path.read_text(errors="ignore")
+            fm = _parse_frontmatter(content)
+            label = fm.get("name", fm.get("title", entity_dir.name))
+            entries.append(MemoryTreeEntry(
+                id=f"{entity_type}/{entity_dir.name}",
+                type=frontend_type,
+                name=label,
+            ))
+    return entries
+
+
+@app.get("/api/v1/admin/memory/page/{type_name}/{entity_id}", response_model=MemoryPageResponse)
+def memory_page(type_name: str, entity_id: str):
+    entity_dir = OUTPUT_DIR / type_name / entity_id
+    page_path = entity_dir / "page.md"
+    if not page_path.exists():
+        raise HTTPException(404, f"Entity {type_name}/{entity_id} not found")
+
+    content = page_path.read_text(errors="ignore")
+    fm = _parse_frontmatter(content)
+    label = fm.get("name", fm.get("title", entity_id))
+    frontend_type = ENTITY_TYPE_MAP.get(type_name, type_name.lower())
+
+    body = content
+    if content.startswith("---"):
+        end = content.index("---", 3)
+        body = content[end + 3:].strip()
+
+    backlinks: list[MemoryBacklink] = []
+    index_path = entity_dir / "_index.md"
+    if index_path.exists():
+        index_content = index_path.read_text(errors="ignore")
+        for match in WIKILINK_PATTERN.finditer(index_content):
+            target_type, target_id, display = match.groups()
+            backlinks.append(MemoryBacklink(
+                id=f"{target_type}/{target_id}",
+                type=ENTITY_TYPE_MAP.get(target_type, target_type.lower()),
+                name=display or target_id,
+            ))
+
+    return MemoryPageResponse(
+        id=f"{type_name}/{entity_id}",
+        type=frontend_type,
+        name=label,
+        frontmatter=fm,
+        body=body,
+        backlinks=backlinks,
+    )
+
+
 # ── Graph ───────────────────────────────────────────────────────────────
 
 ENTITY_TYPE_MAP = {

@@ -1,56 +1,53 @@
 import { useMemo, useState } from "react";
 import { FileText, Folder as FolderIcon, FolderOpen as FolderOpenIcon, Search } from "lucide-react";
-import type { Entity, EntityType } from "@/lib/types";
+import type { MemoryTreeEntry } from "@/lib/api";
 
 interface Props {
-  entities: Entity[];
+  entries: MemoryTreeEntry[];
   selectedId: string;
   onSelect: (id: string) => void;
 }
 
-const FOLDER_ORDER: EntityType[] = [
-  "client",
+const FOLDER_ORDER = [
   "employee",
-  "policy",
+  "client",
   "product",
   "project",
   "decision",
+  "knowledge",
+  "conversation",
+  "email",
+  "support_chat",
 ];
 
-const FOLDER_LABELS: Record<EntityType, string> = {
-  client: "clients",
-  employee: "employees",
-  policy: "policies",
-  product: "products",
-  project: "projects",
-  decision: "decisions",
-};
-
-export function EntityTree({ entities, selectedId, onSelect }: Props) {
+export function EntityTree({ entries, selectedId, onSelect }: Props) {
   const [query, setQuery] = useState("");
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const out: Record<EntityType, Entity[]> = {
-      client: [],
-      employee: [],
-      policy: [],
-      product: [],
-      project: [],
-      decision: [],
-    };
-    for (const e of entities) {
-      if (q && !e.name.toLowerCase().includes(q)) continue;
-      out[e.type].push(e);
+    const out: Record<string, MemoryTreeEntry[]> = {};
+    for (const e of entries) {
+      if (q && !e.name.toLowerCase().includes(q) && !e.id.toLowerCase().includes(q))
+        continue;
+      const t = e.type;
+      if (!out[t]) out[t] = [];
+      out[t].push(e);
     }
-    for (const t of FOLDER_ORDER) {
+    for (const t of Object.keys(out)) {
       out[t].sort((a, b) => a.name.localeCompare(b.name));
     }
     return out;
-  }, [entities, query]);
+  }, [entries, query]);
+
+  const types = useMemo(() => {
+    const present = Object.keys(grouped);
+    const ordered = FOLDER_ORDER.filter((t) => present.includes(t));
+    const extra = present.filter((t) => !FOLDER_ORDER.includes(t)).sort();
+    return [...ordered, ...extra];
+  }, [grouped]);
 
   const isSearching = query.trim().length > 0;
-  const allEmpty = FOLDER_ORDER.every((t) => grouped[t].length === 0);
+  const allEmpty = types.length === 0;
 
   return (
     <div className="flex flex-col">
@@ -63,19 +60,19 @@ export function EntityTree({ entities, selectedId, onSelect }: Props) {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search entities…"
+          placeholder="Search entities..."
           className="w-full rounded-[8px] border border-border bg-background py-1.5 pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-ink-soft focus:border-[color:var(--accent)]"
         />
       </div>
 
       <nav className="space-y-1">
-        {FOLDER_ORDER.map((type) => {
+        {types.map((type) => {
           const list = grouped[type];
-          if (list.length === 0) return null;
+          if (!list || list.length === 0) return null;
           return (
             <FolderGroup
               key={type}
-              label={FOLDER_LABELS[type]}
+              label={type}
               count={list.length}
               defaultOpen={isSearching || list.some((e) => e.id === selectedId)}
             >

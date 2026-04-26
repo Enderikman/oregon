@@ -19,6 +19,8 @@ import type {
   SourceStream,
 } from "./types";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
 export const api = {
   getCurrentUser: () => currentUser,
   listEntities: (): Entity[] => entities,
@@ -36,6 +38,40 @@ export const api = {
   listSourceStreams: (): SourceStream[] => sourceStreams,
   getGraph: () => acmeGraph,
   getTestAnswers: () => testAnswers,
+};
+
+export interface MemoryTreeEntry {
+  id: string;
+  type: string;
+  name: string;
+}
+
+export interface MemoryBacklink {
+  id: string;
+  type: string;
+  name: string | null;
+}
+
+export interface MemoryPage {
+  id: string;
+  type: string;
+  name: string;
+  frontmatter: Record<string, string>;
+  body: string;
+  backlinks: MemoryBacklink[];
+}
+
+export const memoryApi = {
+  fetchTree: async (): Promise<MemoryTreeEntry[]> => {
+    const res = await fetch(`${API_BASE}/api/v1/admin/memory/tree`);
+    if (!res.ok) throw new Error(`Failed to fetch memory tree: ${res.status}`);
+    return res.json();
+  },
+  fetchPage: async (id: string): Promise<MemoryPage> => {
+    const res = await fetch(`${API_BASE}/api/v1/admin/memory/page/${id}`);
+    if (!res.ok) throw new Error(`Failed to fetch page ${id}: ${res.status}`);
+    return res.json();
+  },
 };
 
 export function computeHealth(

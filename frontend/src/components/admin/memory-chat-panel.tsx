@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 type ChatMsg = { id: string; role: "user" | "assistant"; text: string };
 
@@ -20,43 +21,6 @@ const SUGGESTIONS: { label: string; prompt: string; icon: React.ReactNode }[] = 
   { label: "This week's activity", prompt: "How engaged has the user been this week?", icon: <Activity className="w-4 h-4" /> },
   { label: "Open questions", prompt: "What's the user unsure about right now?", icon: <HelpCircle className="w-4 h-4" /> },
 ];
-
-function answerFor(prompt: string): string {
-  const p = prompt.toLowerCase();
-  const user = api.getCurrentUser();
-  const facts = api.listFacts();
-  const userFacts = facts.filter((f) => f.subject === user.id);
-  const questions = api.listQuestions();
-  const open = questions.filter((q) => q.status === "open");
-
-  if (p.includes("role") || p.includes("title") || p.includes("who")) {
-    const role = userFacts.find((f) => f.predicate.toLowerCase().includes("role"));
-    return `${user.name} — ${role?.object ?? "role not yet captured"}.\nConfidence on this fact: ${role ? Math.round(role.confidence * 100) + "%" : "—"}.\n→ Open their profile in the Memory browser for the full picture.`;
-  }
-  if (p.includes("own") || p.includes("responsible") || p.includes("project")) {
-    const owns = userFacts.filter((f) => f.predicate.toLowerCase().includes("own"));
-    if (owns.length === 0) {
-      return `No ownership facts recorded for ${user.name} yet.\nConsider scheduling a short interview to fill this gap.`;
-    }
-    const lines = owns.map((f) => `· ${f.object} (${Math.round(f.confidence * 100)}%)`).join("\n");
-    return `${user.name} owns:\n${lines}`;
-  }
-  if (p.includes("engage") || p.includes("active") || p.includes("week") || p.includes("activity")) {
-    return `${user.name} resolved 4 AI questions in the last 7 days.\nAverage response time: 2h 14m.\nLast active: today.`;
-  }
-  if (p.includes("unsure") || p.includes("question") || p.includes("blocker") || p.includes("stuck")) {
-    if (open.length === 0) return `${user.name} has no open questions in the queue right now.`;
-    const top = open.slice(0, 3).map((q) => `· ${q.question}`).join("\n");
-    return `${user.name} has ${open.length} open question${open.length === 1 ? "" : "s"}:\n${top}`;
-  }
-  if (p.includes("confidence") || p.includes("trust")) {
-    const avg = userFacts.length
-      ? Math.round((userFacts.reduce((s, f) => s + f.confidence, 0) / userFacts.length) * 100)
-      : 0;
-    return `Avg confidence on facts about ${user.name}: ${avg}%.\nBased on ${userFacts.length} fact${userFacts.length === 1 ? "" : "s"} across CRM, email, and interviews.`;
-  }
-  return `I don't have a confident answer about ${user.name} for that yet.\nTry one of the suggested questions, or open their profile in the Memory browser.`;
-}
 
 function useAutoResizeTextarea({ minHeight, maxHeight }: { minHeight: number; maxHeight?: number }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -89,6 +53,7 @@ export function MemoryChatPanel() {
   const [value, setValue] = useState("");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pending, setPending] = useState(false);
+  const convIdRef = useRef<string | null>(null);
   const idRef = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({ minHeight: 60, maxHeight: 200 });
@@ -99,18 +64,27 @@ export function MemoryChatPanel() {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, pending]);
 
-  const submit = (raw: string) => {
+  const submit = async (raw: string) => {
     const text = raw.trim();
     if (!text || pending) return;
     setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
     setValue("");
     adjustHeight(true);
     setPending(true);
-    const reply = answerFor(text);
-    window.setTimeout(() => {
-      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: reply }]);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/admin/memory/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text, conversationId: convIdRef.current }),
+      });
+      const data = await res.json();
+      convIdRef.current = data.conversationId;
+      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: data.reply }]);
+    } catch {
+      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: "Failed to reach the backend. Is the server running?" }]);
+    } finally {
       setPending(false);
-    }, 1000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

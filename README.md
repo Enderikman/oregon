@@ -19,7 +19,8 @@ Humans teach the system through swipe quizzes and voice interviews. Admins inspe
 cd frontend && bun install && bun run dev   # → http://localhost:8080
 
 # full stack (backend + frontend)
-./dev.sh                                    # → backend :8000, frontend :8080
+cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd .. && ./dev.sh                           # → backend :8000, frontend :8080
 ```
 
 ---

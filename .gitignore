@@ -1,6 +1,10 @@
 # Archived prototypes / scratch
 archive/
 
+# Python
+.venv/
+__pycache__/
+
 # Env / secrets
 .env
 .env.*
@@ -18,3 +22,6 @@ archive/
 
 # Node
 node_modules/
+
+# Data
+data/
