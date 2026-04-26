@@ -26,7 +26,7 @@ All data is mocked in `src/lib/mock-data.ts`. There is no backend.
 - `/settings`
 - `/admin` (layout) — gated admin surface with sub-nav:
   - `/admin` — overview (health strip, trends, memory chat panel)
-  - `/admin/map` — neural map (reactflow graph of entities and facts)
+  - `/admin/map` — neural map (react-force-graph 2D/3D of entities and facts)
   - `/admin/interviews` + `/admin/interviews/$id` — interview log and detail
   - `/admin/conflicts` — conflicting facts queue
   - `/admin/memory` — VFS-style memory browser (entity tree → entity detail with facts → backlinks/provenance, interview transcript drawer)

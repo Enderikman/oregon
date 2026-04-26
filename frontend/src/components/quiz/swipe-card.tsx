@@ -6,7 +6,7 @@ import { ContextChips } from "./context-chips";
 
 type Props = {
   question: Question;
-  onDecide: (decision: Decision) => void;
+  onDecide: (decision: Decision, source: "swipe" | "click" | "key") => void;
   onClarify: () => void;
   isTop: boolean;
   depth: number;
@@ -37,13 +37,13 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
     const movedY = offset.y;
 
     if (allowYesNo && (offset.x > SWIPE_THRESHOLD || velocity.x > VELOCITY_THRESHOLD)) {
-      onDecide("yes");
+      onDecide("yes", "swipe");
     } else if (allowYesNo && (offset.x < -SWIPE_THRESHOLD || velocity.x < -VELOCITY_THRESHOLD)) {
-      onDecide("no");
+      onDecide("no", "swipe");
     } else if (movedY < -SWIPE_THRESHOLD || velocity.y < -VELOCITY_THRESHOLD) {
-      onDecide("skip");
+      onDecide("skip", "swipe");
     } else if (movedY > SWIPE_THRESHOLD || velocity.y > VELOCITY_THRESHOLD) {
-      onDecide("dont_know");
+      onDecide("dont_know", "swipe");
     }
     if (movedX > 6 || Math.abs(movedY) > 6) dragMoved.current = true;
   }
@@ -201,7 +201,7 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
                       onPointerDownCapture={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDecide(opt);
+                        onDecide(opt, "click");
                       }}
                       className="relative px-4 py-3 rounded-xl border border-border bg-secondary/60 hover:bg-accent active:scale-[0.98] transition text-sm font-medium text-foreground"
                     >
@@ -218,7 +218,7 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
                   onPointerDownCapture={(e) => e.stopPropagation()}
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (textValue.trim()) onDecide(textValue.trim());
+                    if (textValue.trim()) onDecide(textValue.trim(), "click");
                   }}
                   className="flex items-center gap-2"
                 >
@@ -249,7 +249,7 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
                 onPointerDown={(e) => e.stopPropagation()}
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (textValue.trim()) onDecide(textValue.trim());
+                  if (textValue.trim()) onDecide(textValue.trim(), "click");
                 }}
                 className="relative z-10 mt-7"
               >
@@ -273,7 +273,7 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                onDecide("dont_know");
+                onDecide("dont_know", "click");
               }}
               className="relative z-10 self-center inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition px-3 py-1.5 rounded-full hover:bg-muted"
             >

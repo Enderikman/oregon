@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { useMemoryStore } from "@/lib/memory-context";
+import { useTheme } from "@/lib/theme-context";
 import { entities as allEntities, sources as allSources } from "@/lib/mock-data";
 import { buildAdjacency, buildNeuralGraph, neighborhood } from "./build-graph";
 import { GraphView, type GraphDim } from "./graph-view";
@@ -7,6 +9,7 @@ import { NeuralLegend, NeuralScrubber, NeuralSearch, NeuralSidePanel } from "./p
 
 export function NeuralMap() {
   const { facts } = useMemoryStore();
+  const { resolvedTheme, setTheme } = useTheme();
   const sourceById = useMemo(() => new Map(allSources.map((s) => [s.id, s])), []);
   const factById = useMemo(() => new Map(facts.map((f) => [f.id, f])), [facts]);
   const entityById = useMemo(() => new Map(allEntities.map((e) => [e.id, e])), []);
@@ -136,6 +139,7 @@ export function NeuralMap() {
         edges={visibleEdges}
         focusedSet={focusedSet}
         selectedId={selectedId}
+        resolvedTheme={resolvedTheme}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onBackgroundClick={onBackgroundClick}
@@ -148,7 +152,13 @@ export function NeuralMap() {
         onSelect={handleSearchSelect}
       />
 
-      <DimToggle dim={dim} onChange={setDim} />
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <ThemeToggle
+          resolvedTheme={resolvedTheme}
+          onToggle={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+        />
+        <DimToggle dim={dim} onChange={setDim} />
+      </div>
 
       <NeuralLegend />
 
@@ -179,7 +189,7 @@ function DimToggle({ dim, onChange }: { dim: GraphDim; onChange: (d: GraphDim) =
     <div
       role="tablist"
       aria-label="Graph dimension"
-      className="absolute right-4 top-4 z-20 flex overflow-hidden rounded-[10px] border border-border bg-surface shadow-soft"
+      className="flex overflow-hidden rounded-[10px] border border-border bg-surface shadow-soft"
     >
       {(["2d", "3d"] as const).map((d) => {
         const active = d === dim;
@@ -200,5 +210,26 @@ function DimToggle({ dim, onChange }: { dim: GraphDim; onChange: (d: GraphDim) =
         );
       })}
     </div>
+  );
+}
+
+function ThemeToggle({
+  resolvedTheme,
+  onToggle,
+}: {
+  resolvedTheme: "light" | "dark";
+  onToggle: () => void;
+}) {
+  const Icon = resolvedTheme === "dark" ? Sun : Moon;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
+      title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
+      className="grid h-[30px] w-[30px] place-items-center rounded-[10px] border border-border bg-surface text-ink-muted shadow-soft transition-colors hover:bg-surface-2 hover:text-ink"
+    >
+      <Icon size={14} />
+    </button>
   );
 }

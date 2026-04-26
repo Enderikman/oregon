@@ -11,6 +11,7 @@ export interface GraphViewProps {
   edges: BuiltEdge[];
   focusedSet: Set<string> | null;
   selectedId: string | null;
+  resolvedTheme: "light" | "dark";
   onNodeClick: (id: string, kind: "entity" | "fact") => void;
   onEdgeClick: (sourceId: string, targetId: string) => void;
   onBackgroundClick: () => void;

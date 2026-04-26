@@ -5,7 +5,7 @@ import { SwipeCard } from "./swipe-card";
 type Props = {
   current?: Question;
   upcoming: Question[];
-  onDecide: (decision: Decision) => void;
+  onDecide: (decision: Decision, source: "swipe" | "click" | "key") => void;
   onClarify: () => void;
   easy?: boolean;
 };

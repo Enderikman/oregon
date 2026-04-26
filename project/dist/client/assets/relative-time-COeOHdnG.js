@@ -1,0 +1,1 @@
+import{r,H as n,j as l}from"./index-BldNiaVy.js";function u({iso:e,className:a}){const[s,t]=r.useState(null);return r.useEffect(()=>{t(n(e));const i=window.setInterval(()=>t(n(e)),3e4);return()=>window.clearInterval(i)},[e]),l.jsx("span",{className:a,suppressHydrationWarning:!0,children:s??"—"})}export{u as R};

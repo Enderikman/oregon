@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import { useMemoryStore } from "@/lib/memory-context";
-import { isSpeechSupported, startDictation } from "@/lib/speech";
+import { isSpeechSupported, speak, startDictation } from "@/lib/speech";
 import type { AIQuestion } from "@/lib/types";
 import { QuestionProgress } from "./question-progress";
 import { VoiceStage } from "./voice-stage";
@@ -52,6 +52,7 @@ export function InterviewPage({ sessionId }: Props) {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interim, setInterim] = useState("");
   const [pendingAnswer, setPendingAnswer] = useState<string>("");
+  const [pendingAnswerEdited, setPendingAnswerEdited] = useState<boolean>(false);
   const [resolved, setResolved] = useState<ResolvedPair[]>([]);
   const [skipped, setSkipped] = useState<AIQuestion[]>([]);
   const startedAtRef = useRef<string>(new Date().toISOString());
@@ -59,7 +60,10 @@ export function InterviewPage({ sessionId }: Props) {
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pttKeyDownAtRef = useRef<number>(0);
+  const pttMicWasOnRef = useRef<boolean>(false);
   const voiceSupported = isSpeechSupported();
+  const PTT_TAP_MS = 130;
 
   const total = initialQueue.length;
   const current = initialQueue[currentIndex];
@@ -72,9 +76,8 @@ export function InterviewPage({ sessionId }: Props) {
       clearTimeout(advanceTimer.current);
       advanceTimer.current = null;
     }
-    if (typeof window !== "undefined") {
-      try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
-    }
+    // Note: HTTP-based TTS has no equivalent of speechSynthesis.cancel();
+    // playback runs to completion. Bot-interrupt is a no-op for now.
   };
 
   const appendAgent = (text: string) =>
@@ -94,23 +97,15 @@ export function InterviewPage({ sessionId }: Props) {
     setPhase("speaking");
     appendAgent(q.question);
 
-    let spoke = false;
-    if (typeof window !== "undefined" && window.speechSynthesis) {
+    void (async () => {
       try {
-        const u = new SpeechSynthesisUtterance(q.question);
-        u.rate = 1;
-        u.pitch = 1;
-        u.onend = () => beginListening(q);
-        window.speechSynthesis.speak(u);
-        spoke = true;
+        await speak(q.question);
+        beginListening(q);
       } catch {
-        spoke = false;
+        // Fallback: pretend we asked, then move to listening
+        advanceTimer.current = setTimeout(() => beginListening(q), 1200);
       }
-    }
-    if (!spoke) {
-      // Fallback: pretend we asked, then move to listening
-      advanceTimer.current = setTimeout(() => beginListening(q), 1200);
-    }
+    })();
   };
 
   const beginListening = (q: AIQuestion) => {
@@ -137,6 +132,7 @@ export function InterviewPage({ sessionId }: Props) {
     stopAll();
     setInterim("");
     setPendingAnswer(choice);
+    setPendingAnswerEdited(false);
     setPhase("confirming");
   };
 
@@ -148,11 +144,18 @@ export function InterviewPage({ sessionId }: Props) {
     resolveQuestion(current.id, choice);
     setResolved((prev) => [...prev, { question: current, answer: choice }]);
     setPendingAnswer("");
+    setPendingAnswerEdited(false);
     advanceTimer.current = setTimeout(() => goNext(), 600);
+  };
+
+  const handleEditCommit = (text: string) => {
+    setPendingAnswer(text);
+    setPendingAnswerEdited(true);
   };
 
   const handleEdit = () => {
     setPendingAnswer("");
+    setPendingAnswerEdited(false);
     if (current) {
       askCurrent(current);
     }
@@ -160,6 +163,7 @@ export function InterviewPage({ sessionId }: Props) {
 
   const handleDismiss = () => {
     setPendingAnswer("");
+    setPendingAnswerEdited(false);
     if (current) beginListening(current);
   };
 
@@ -194,9 +198,7 @@ export function InterviewPage({ sessionId }: Props) {
     const endedAt = new Date().toISOString();
     const startedAt = startedAtRef.current;
     const topic =
-      resolved[0]?.question.question ??
-      initialQueue[0]?.question ??
-      "Interview session";
+      resolved[0]?.question.question ?? initialQueue[0]?.question ?? "Interview session";
     recordSession({
       id: sessionId,
       mode: "voice",
@@ -225,6 +227,83 @@ export function InterviewPage({ sessionId }: Props) {
   useEffect(() => {
     return () => stopAll();
   }, []);
+
+  // Space-key mic control: tap to toggle, hold for push-to-talk.
+  // Mirrors the standalone voice-agent UI behavior — short press flips
+  // dictation on/off; long press keeps the mic open while held.
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return true;
+      if (target.isContentEditable) return true;
+      return false;
+    };
+
+    const canToggleMic = (): boolean => {
+      // Don't try to drive the mic during phases where it isn't meaningful.
+      if (!current) return false;
+      if (phase === "done" || phase === "processing" || phase === "confirming") {
+        return false;
+      }
+      return true;
+    };
+
+    const startMic = () => {
+      if (!canToggleMic()) return;
+      if (cleanupRef.current) return; // already listening
+      beginListening(current);
+    };
+
+    const stopMic = () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      setInterim("");
+      // Drop back to idle so the orb stops pulsing as "listening".
+      if (phase === "listening") setPhase("idle");
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (pttKeyDownAtRef.current !== 0) return;
+      pttKeyDownAtRef.current = Date.now();
+      pttMicWasOnRef.current = !!cleanupRef.current;
+      // Open mic immediately so hold-to-talk feels instant. A tap that
+      // happened with the mic already on is reconciled on keyup.
+      if (!cleanupRef.current) startMic();
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      if (pttKeyDownAtRef.current === 0) return;
+      const elapsed = Date.now() - pttKeyDownAtRef.current;
+      const wasOnBefore = pttMicWasOnRef.current;
+      pttKeyDownAtRef.current = 0;
+      pttMicWasOnRef.current = false;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (elapsed < PTT_TAP_MS) {
+        // Tap — toggle relative to the pre-press state.
+        if (wasOnBefore) {
+          stopMic();
+        }
+        // else: keydown already started the mic; leave it on.
+      } else {
+        // Hold release — classic PTT, close the mic.
+        stopMic();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, current]);
 
   // Empty queue (nothing was open when the route loaded)
   if (total === 0) {
@@ -299,7 +378,8 @@ export function InterviewPage({ sessionId }: Props) {
             className="mb-6 rounded-[14px] border border-border px-4 py-3 text-[13px] text-ink-muted"
             style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning)" }}
           >
-            Voice input isn't supported in this browser. Use the candidate buttons or skip to continue.
+            Voice input isn't supported in this browser. Use the candidate buttons or skip to
+            continue.
           </div>
         )}
 
@@ -310,8 +390,10 @@ export function InterviewPage({ sessionId }: Props) {
               q={current}
               phase={phase}
               pendingAnswer={pendingAnswer}
+              pendingAnswerEdited={pendingAnswerEdited}
               onConfirm={handleConfirm}
               onEdit={handleEdit}
+              onEditCommit={handleEditCommit}
               onDismiss={handleDismiss}
               onCandidate={handleResolve}
             />

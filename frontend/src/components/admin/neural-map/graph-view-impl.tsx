@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import ForceGraph2D, { type ForceGraphMethods as ForceGraphMethods2D } from "react-force-graph-2d";
 import ForceGraph3D, { type ForceGraphMethods as ForceGraphMethods3D } from "react-force-graph-3d";
-import * as THREE from "three";
 import type { BuiltNode } from "./build-graph";
 import { cssVar, edgeColor, entityColor, withAlpha } from "./colors";
 import type { GraphViewProps } from "./graph-view";
@@ -42,6 +41,7 @@ export function GraphViewImpl({
   edges,
   focusedSet,
   selectedId,
+  resolvedTheme,
   onNodeClick,
   onEdgeClick,
   onBackgroundClick,
@@ -70,18 +70,24 @@ export function GraphViewImpl({
   }, [nodes, edges]);
 
   useEffect(() => {
-    const fg = dim === "2d" ? fg2d.current : fg3d.current;
-    if (!fg) return;
-    fg.d3Force("charge")?.strength(dim === "2d" ? -240 : -160);
-    const linkForce = fg.d3Force("link") as
-      | {
-          distance: (fn: (l: FGLink) => number) => unknown;
-          strength: (n: number) => unknown;
-        }
-      | undefined;
-    linkForce?.distance((l: FGLink) => (l.kind === "ref" ? 90 : 50));
-    linkForce?.strength(0.6);
-    fg.d3ReheatSimulation?.();
+    // Defer past the kapsule digest so `state.layout` is initialized before
+    // we reheat — calling d3ReheatSimulation too early flips engineRunning=true
+    // while state.layout is still undefined and the next tick crashes (3D only).
+    const id = window.setTimeout(() => {
+      const fg = dim === "2d" ? fg2d.current : fg3d.current;
+      if (!fg) return;
+      fg.d3Force("charge")?.strength(dim === "2d" ? -240 : -160);
+      const linkForce = fg.d3Force("link") as
+        | {
+            distance: (fn: (l: FGLink) => number) => unknown;
+            strength: (n: number) => unknown;
+          }
+        | undefined;
+      linkForce?.distance((l: FGLink) => (l.kind === "ref" ? 90 : 50));
+      linkForce?.strength(0.6);
+      fg.d3ReheatSimulation?.();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [dim, data]);
 
   const colors = useMemo(() => {
@@ -94,9 +100,15 @@ export function GraphViewImpl({
       conflict: cssVar("--graph-conflict", "#a85a5a"),
       human: cssVar("--graph-human", "#412bcf"),
     };
-    // re-read on dim change so a theme toggle while switching tabs picks up new vars
+    // re-read whenever theme flips (resolvedTheme drives the .dark class)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dim]);
+  }, [resolvedTheme]);
+
+  const factColor = (node: FGNode): string => {
+    if (node.inConflict) return colors.conflict;
+    if (node.factSource === "human") return colors.human;
+    return colors.inkSoft;
+  };
 
   const drawNode2D = (node: FGNode, ctx: CanvasRenderingContext2D, scale: number) => {
     const faded = focusedSet ? !focusedSet.has(node.id) : false;
@@ -141,18 +153,13 @@ export function GraphViewImpl({
       }
     } else {
       const r = 2.5;
-      const color = node.inConflict
-        ? colors.conflict
-        : node.factSource === "human"
-          ? colors.human
-          : colors.inkSoft;
-      ctx.fillStyle = withAlpha(color, faded ? 0.25 : 0.85);
+      ctx.fillStyle = withAlpha(factColor(node), faded ? 0.25 : 0.85);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
 
       if (selected) {
-        ctx.strokeStyle = color;
+        ctx.strokeStyle = factColor(node);
         ctx.lineWidth = 1.5 / scale;
         ctx.beginPath();
         ctx.arc(x, y, r + 2 / scale, 0, Math.PI * 2);
@@ -169,33 +176,6 @@ export function GraphViewImpl({
     ctx.fill();
   };
 
-  const nodeThreeObject = (node: FGNode) => {
-    const faded = focusedSet ? !focusedSet.has(node.id) : false;
-    if (node.kind === "entity") {
-      const r = entityRadius(node.factCount ?? 0) * 0.5;
-      const color = entityColor(node.entityType ?? "client");
-      const geom = new THREE.SphereGeometry(r, 16, 16);
-      const mat = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: faded ? 0.25 : 0.95,
-      });
-      return new THREE.Mesh(geom, mat);
-    }
-    const color = node.inConflict
-      ? colors.conflict
-      : node.factSource === "human"
-        ? colors.human
-        : colors.inkSoft;
-    const geom = new THREE.SphereGeometry(1.2, 8, 8);
-    const mat = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: faded ? 0.25 : 0.85,
-    });
-    return new THREE.Mesh(geom, mat);
-  };
-
   const linkColor = (l: FGLink) => {
     const faded =
       focusedSet &&
@@ -208,6 +188,19 @@ export function GraphViewImpl({
   };
 
   const linkWidth = (l: FGLink) => (l.kind === "ref" ? 0.6 : 0.9);
+
+  const node3DColor = (node: FGNode): string => {
+    if (node.kind === "entity") return entityColor(node.entityType ?? "client");
+    return factColor(node);
+  };
+
+  const node3DVal = (node: FGNode): number => {
+    if (node.kind === "entity") {
+      const r = entityRadius(node.factCount ?? 0) * 0.5;
+      return r * r; // val ~ volume; force-graph-3d derives radius via sqrt
+    }
+    return 1;
+  };
 
   const sharedNodeHandlers = {
     onNodeClick: (n: FGNode) => onNodeClick(n.id, n.kind),
@@ -261,10 +254,14 @@ export function GraphViewImpl({
       height={height}
       graphData={data}
       backgroundColor={colors.background}
-      nodeThreeObject={nodeThreeObject}
+      nodeColor={node3DColor}
+      nodeVal={node3DVal}
+      nodeOpacity={0.9}
+      nodeResolution={16}
+      nodeRelSize={4}
       linkColor={linkColor}
       linkWidth={linkWidth}
-      linkOpacity={0.55}
+      linkOpacity={0.6}
       linkLabel={() => ""}
       nodeLabel={(n: FGNode) => n.label}
       showNavInfo={false}

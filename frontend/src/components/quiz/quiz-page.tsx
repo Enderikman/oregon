@@ -90,10 +90,15 @@ function QuizPageInner({ sessionId }: Props) {
     });
   }
 
-  function handleDecide(decision: Decision) {
+  function handleDecide(decision: Decision, source: "swipe" | "click" | "key") {
     if (!current) return;
     setClarifyOpen(false);
-    if (decision !== "skip" && decision !== "dont_know" && current.followup) {
+    if (
+      source === "swipe" &&
+      decision !== "skip" &&
+      decision !== "dont_know" &&
+      current.followup
+    ) {
       setPendingDecision(decision);
       return;
     }
@@ -116,9 +121,11 @@ function QuizPageInner({ sessionId }: Props) {
   const isYesNo = current?.type === "yesno";
   useQuizKeyboard(
     {
-      onYes: () => current && isYesNo && !clarifyOpen && !pendingDecision && handleDecide("yes"),
-      onNo: () => current && isYesNo && !clarifyOpen && !pendingDecision && handleDecide("no"),
-      onSkip: () => current && !clarifyOpen && !pendingDecision && handleDecide("skip"),
+      onYes: () =>
+        current && isYesNo && !clarifyOpen && !pendingDecision && handleDecide("yes", "key"),
+      onNo: () =>
+        current && isYesNo && !clarifyOpen && !pendingDecision && handleDecide("no", "key"),
+      onSkip: () => current && !clarifyOpen && !pendingDecision && handleDecide("skip", "key"),
       onClarify: () => current && !pendingDecision && setClarifyOpen((o) => !o),
       onUndo: () => !clarifyOpen && !pendingDecision && undo(),
     },
@@ -136,7 +143,7 @@ function QuizPageInner({ sessionId }: Props) {
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= Math.min(opts.length, 9)) {
         e.preventDefault();
-        handleDecide(opts[n - 1]);
+        handleDecide(opts[n - 1], "key");
       }
     };
     window.addEventListener("keydown", handler);
@@ -256,7 +263,7 @@ function QuizPageInner({ sessionId }: Props) {
             {easy && current && (
               <EasyActionBar
                 question={current}
-                onDecide={handleDecide}
+                onDecide={(d) => handleDecide(d, "click")}
                 onClarify={() => setClarifyOpen(true)}
               />
             )}
