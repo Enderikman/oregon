@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, RefreshCw, Mic, Layers, CheckCircle2, AlertTriangle, Bot, Play } from "lucide-react";
+import { ArrowLeft, RefreshCw, Mic, Layers, CheckCircle2, AlertTriangle, Play } from "lucide-react";
+import { VoiceTranscript, SwipeReplay } from "./interview-turns";
 import {
   adminInterviews,
   facts as allFacts,
@@ -158,15 +159,9 @@ export function InterviewDetailPage({ interviewId }: Props) {
                 No transcript captured for this session.
               </p>
             ) : interview.mode === "voice" ? (
-              <VoiceTranscript
-                interviewee={interview.interviewee}
-                turns={linkedQuestions}
-              />
+              <VoiceTranscript interviewee={interview.interviewee} turns={linkedQuestions} />
             ) : (
-              <SwipeReplay
-                interviewee={interview.interviewee}
-                turns={linkedQuestions}
-              />
+              <SwipeReplay interviewee={interview.interviewee} turns={linkedQuestions} />
             )}
           </section>
 
@@ -180,8 +175,8 @@ export function InterviewDetailPage({ interviewId }: Props) {
               </div>
             </div>
             <p className="mb-4 text-[12px] text-ink-muted">
-              Edges this interview created or strengthened. Solid links were
-              created here; dashed links existed before and were re-confirmed.
+              Edges this interview created or strengthened. Solid links were created here; dashed
+              links existed before and were re-confirmed.
             </p>
             <SubgraphView
               interviewee={interview.interviewee}
@@ -206,9 +201,7 @@ export function InterviewDetailPage({ interviewId }: Props) {
               <Stat
                 label="Accuracy"
                 value={
-                  interview.status === "pending"
-                    ? "—"
-                    : `${Math.round(interview.accuracy * 100)}%`
+                  interview.status === "pending" ? "—" : `${Math.round(interview.accuracy * 100)}%`
                 }
               />
               <Stat
@@ -228,8 +221,7 @@ export function InterviewDetailPage({ interviewId }: Props) {
             </div>
             {autoAdded.length === 0 ? (
               <p className="text-[12px] italic text-ink-soft">
-                Nothing crossed the auto-add threshold (≥85% confidence, no
-                conflict).
+                Nothing crossed the auto-add threshold (≥85% confidence, no conflict).
               </p>
             ) : (
               <ul className="space-y-2">
@@ -248,9 +240,7 @@ export function InterviewDetailPage({ interviewId }: Props) {
               </div>
             </div>
             {flagged.length === 0 ? (
-              <p className="text-[12px] italic text-ink-soft">
-                Nothing flagged. Clean run.
-              </p>
+              <p className="text-[12px] italic text-ink-soft">Nothing flagged. Clean run.</p>
             ) : (
               <ul className="space-y-2">
                 {flagged.map((f) => (
@@ -316,107 +306,11 @@ function Stat({
   const color = tone === "warning" ? "var(--warning)" : "var(--ink)";
   return (
     <div className="rounded-[10px] border border-border bg-surface-2 px-2.5 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-wider text-ink-soft">
-        {label}
-      </div>
+      <div className="font-mono text-[9px] uppercase tracking-wider text-ink-soft">{label}</div>
       <div className="mt-1 font-mono text-[18px] tabular-nums leading-none" style={{ color }}>
         {value}
       </div>
     </div>
-  );
-}
-
-function VoiceTranscript({
-  interviewee,
-  turns,
-}: {
-  interviewee: AdminInterview["interviewee"];
-  turns: ReturnType<typeof useMemoryStore>["questions"];
-}) {
-  return (
-    <ul className="space-y-4">
-      {turns.map((q, i) => (
-        <li key={q.id} className="space-y-2">
-          <div className="flex items-end gap-2">
-            <div
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-[10px]"
-              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent-ink)" }}
-            >
-              <Bot size={12} />
-            </div>
-            <div
-              className="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-2.5 text-[13px] text-ink"
-              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent-ink)" }}
-            >
-              {q.question}
-            </div>
-            <span className="font-mono text-[9px] tabular-nums text-ink-soft">
-              {String(i + 1).padStart(2, "0")}
-            </span>
-          </div>
-          {q.status === "resolved" && q.resolution && (
-            <div className="flex items-end justify-end gap-2">
-              <div className="max-w-[80%] rounded-2xl rounded-br-md border border-border bg-surface-2 px-4 py-2.5 text-[13px] text-ink">
-                {q.resolution.choice}
-              </div>
-              <div
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-[10px]"
-                style={{ backgroundColor: "var(--surface-2)", color: "var(--ink)" }}
-              >
-                {interviewee.initials}
-              </div>
-            </div>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function SwipeReplay({
-  interviewee,
-  turns,
-}: {
-  interviewee: AdminInterview["interviewee"];
-  turns: ReturnType<typeof useMemoryStore>["questions"];
-}) {
-  return (
-    <ol className="grid gap-3 sm:grid-cols-2">
-      {turns.map((q, i) => {
-        const answered = q.status === "resolved" && q.resolution;
-        return (
-          <li
-            key={q.id}
-            className="rounded-[12px] border border-border bg-surface-2 p-4"
-          >
-            <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-ink-soft">
-              <span>card {String(i + 1).padStart(2, "0")}</span>
-              <span
-                className="rounded-full px-1.5 py-0.5 text-[9px]"
-                style={{
-                  backgroundColor: answered ? "var(--accent-soft)" : "var(--surface)",
-                  color: answered ? "var(--accent-ink)" : "var(--ink-soft)",
-                }}
-              >
-                {answered ? "answered" : "skipped"}
-              </span>
-            </div>
-            <div className="text-[13px] text-ink">{q.question}</div>
-            {answered && q.resolution && (
-              <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
-                <div
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md font-mono text-[9px]"
-                  style={{ backgroundColor: "var(--surface)", color: "var(--ink)" }}
-                >
-                  {interviewee.initials}
-                </div>
-                <div className="text-[12px] italic text-ink">“{q.resolution.choice}”</div>
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 
@@ -531,7 +425,11 @@ function SubgraphView({
                 x={midX}
                 y={(personY + p.y) / 2 - 6}
                 textAnchor="middle"
-                style={{ fontSize: 9, fontFamily: "var(--font-mono, monospace)", fill: "var(--ink-soft)" }}
+                style={{
+                  fontSize: 9,
+                  fontFamily: "var(--font-mono, monospace)",
+                  fill: "var(--ink-soft)",
+                }}
               >
                 {eFacts.length} {eFacts.length === 1 ? "fact" : "facts"}
               </text>
@@ -541,12 +439,23 @@ function SubgraphView({
 
         {/* interviewee */}
         <g>
-          <circle cx={personX} cy={personY} r={26} fill="var(--accent-soft)" stroke="var(--accent)" strokeWidth={1.5} />
+          <circle
+            cx={personX}
+            cy={personY}
+            r={26}
+            fill="var(--accent-soft)"
+            stroke="var(--accent)"
+            strokeWidth={1.5}
+          />
           <text
             x={personX}
             y={personY + 4}
             textAnchor="middle"
-            style={{ fontSize: 11, fontFamily: "var(--font-mono, monospace)", fill: "var(--accent-ink)" }}
+            style={{
+              fontSize: 11,
+              fontFamily: "var(--font-mono, monospace)",
+              fill: "var(--accent-ink)",
+            }}
           >
             {interviewee.initials}
           </text>
@@ -573,17 +482,19 @@ function SubgraphView({
               stroke="var(--border)"
               strokeWidth={1}
             />
-            <text
-              x={p.x + 4}
-              y={p.y + 4}
-              style={{ fontSize: 11, fill: "var(--ink)" }}
-            >
+            <text x={p.x + 4} y={p.y + 4} style={{ fontSize: 11, fill: "var(--ink)" }}>
               {p.name.length > 18 ? p.name.slice(0, 17) + "…" : p.name}
             </text>
             <text
               x={p.x + 4}
               y={p.y - 18}
-              style={{ fontSize: 8, fontFamily: "var(--font-mono, monospace)", fill: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: 0.5 }}
+              style={{
+                fontSize: 8,
+                fontFamily: "var(--font-mono, monospace)",
+                fill: "var(--ink-soft)",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
             >
               {p.type}
             </text>

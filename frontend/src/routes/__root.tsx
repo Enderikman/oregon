@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { TopNav } from "@/components/shell/top-nav";
+import { UserIdGate } from "@/components/shell/user-id-gate";
 import { MemoryProvider } from "@/lib/memory-context";
 import { ThemeProvider } from "@/lib/theme-context";
 
@@ -78,6 +79,7 @@ function RootComponent() {
         <Outlet />
         <Toaster />
         <DevResetButton />
+        <UserIdGate />
       </MemoryProvider>
     </ThemeProvider>
   );

@@ -1,17 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMemoryStore } from "@/lib/memory-context";
 import { entities as allEntities, sources as allSources } from "@/lib/mock-data";
-import { buildAdjacency, buildNeuralGraph, neighborhood } from "./build-graph";
+import {
+  buildAdjacency,
+  buildNeuralGraph,
+  neighborhood,
+} from "./build-graph";
 import { GraphView, type GraphDim } from "./graph-view";
-import { NeuralLegend, NeuralScrubber, NeuralSearch, NeuralSidePanel } from "./panels";
+import {
+  NeuralLegend,
+  NeuralScrubber,
+  NeuralSearch,
+  NeuralSidePanel,
+} from "./panels";
 
 export function NeuralMap() {
   const { facts } = useMemoryStore();
-  const sourceById = useMemo(() => new Map(allSources.map((s) => [s.id, s])), []);
+  const sourceById = useMemo(
+    () => new Map(allSources.map((s) => [s.id, s])),
+    [],
+  );
   const factById = useMemo(() => new Map(facts.map((f) => [f.id, f])), [facts]);
-  const entityById = useMemo(() => new Map(allEntities.map((e) => [e.id, e])), []);
+  const entityById = useMemo(
+    () => new Map(allEntities.map((e) => [e.id, e])),
+    [],
+  );
 
-  const built = useMemo(() => buildNeuralGraph(allEntities, facts), [facts]);
+  const built = useMemo(
+    () => buildNeuralGraph(allEntities, facts),
+    [facts],
+  );
 
   // Time scrubber bounds — clamp to the last 12 months.
   const { minTs, maxTs } = useMemo(() => {
@@ -28,11 +46,13 @@ export function NeuralMap() {
   const [selectedFactId, setSelectedFactId] = useState<string | null>(null);
   const [dim, setDim] = useState<GraphDim>("2d");
 
+  // Visible edges by time
   const visibleEdges = useMemo(
     () => built.edges.filter((e) => e.createdAt <= scrubTs),
     [built.edges, scrubTs],
   );
 
+  // Visible node ids: entities always shown; facts only when their fact-link edge is visible.
   const visibleNodeIds = useMemo(() => {
     const set = new Set<string>();
     for (const n of built.nodes) {
@@ -49,12 +69,14 @@ export function NeuralMap() {
     [built.nodes, visibleNodeIds],
   );
 
+  // Focus neighborhood (2 hops) using only currently-visible edges
   const focusedSet = useMemo(() => {
     if (!focusId) return null;
     const visAdj = buildAdjacency(visibleEdges);
     return neighborhood(focusId, visAdj, 2);
   }, [focusId, visibleEdges]);
 
+  // Container sizing
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   useEffect(() => {
@@ -68,28 +90,32 @@ export function NeuralMap() {
     return () => ro.disconnect();
   }, []);
 
+  // Click handlers
   const focusedRef = useRef<string | null>(null);
-  const onNodeClick = useCallback((id: string, kind: "entity" | "fact") => {
-    if (kind === "entity") {
-      if (focusedRef.current === id) {
-        focusedRef.current = null;
-        setFocusId(null);
+  const onNodeClick = useCallback(
+    (id: string, kind: "entity" | "fact") => {
+      if (kind === "entity") {
+        if (focusedRef.current === id) {
+          focusedRef.current = null;
+          setFocusId(null);
+        } else {
+          focusedRef.current = id;
+          setFocusId(id);
+          setSelectedFactId(null);
+        }
       } else {
-        focusedRef.current = id;
-        setFocusId(id);
-        setSelectedFactId(null);
+        setSelectedFactId(id);
       }
-    } else {
-      setSelectedFactId(id);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const onEdgeClick = useCallback((sourceId: string, targetId: string) => {
     const factId = targetId.startsWith("f-")
       ? targetId
       : sourceId.startsWith("f-")
-        ? sourceId
-        : null;
+      ? sourceId
+      : null;
     if (factId) setSelectedFactId(factId);
   }, []);
 
@@ -107,20 +133,25 @@ export function NeuralMap() {
 
   const selectedId = selectedFactId ?? focusId;
 
-  const selectedFact = selectedFactId ? (factById.get(selectedFactId) ?? null) : null;
-  const subject = selectedFact ? (entityById.get(selectedFact.subject) ?? null) : null;
-  const source = selectedFact ? (sourceById.get(selectedFact.sourceId) ?? null) : null;
+  // Side panel data
+  const selectedFact = selectedFactId ? factById.get(selectedFactId) ?? null : null;
+  const subject = selectedFact ? entityById.get(selectedFact.subject) ?? null : null;
+  const source = selectedFact ? sourceById.get(selectedFact.sourceId) ?? null : null;
   const conflictingFact = selectedFact?.conflictingFactId
-    ? (factById.get(selectedFact.conflictingFactId) ?? null)
+    ? factById.get(selectedFact.conflictingFactId) ?? null
     : null;
 
   const { sessions, questions } = useMemoryStore();
   const relatedSessions = useMemo(() => {
     if (!selectedFactId) return [];
     const touchingQuestionIds = new Set(
-      questions.filter((q) => q.affectedFactIds.includes(selectedFactId)).map((q) => q.id),
+      questions
+        .filter((q) => q.affectedFactIds.includes(selectedFactId))
+        .map((q) => q.id),
     );
-    return sessions.filter((s) => s.questionIds.some((qid) => touchingQuestionIds.has(qid)));
+    return sessions.filter((s) =>
+      s.questionIds.some((qid) => touchingQuestionIds.has(qid)),
+    );
   }, [sessions, questions, selectedFactId]);
 
   return (
@@ -174,7 +205,13 @@ export function NeuralMap() {
   );
 }
 
-function DimToggle({ dim, onChange }: { dim: GraphDim; onChange: (d: GraphDim) => void }) {
+function DimToggle({
+  dim,
+  onChange,
+}: {
+  dim: GraphDim;
+  onChange: (d: GraphDim) => void;
+}) {
   return (
     <div
       role="tablist"

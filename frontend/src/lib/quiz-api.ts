@@ -138,7 +138,10 @@ export function useQuizSession(sessionId: string) {
       })
       .map(aiQuestionToQuestion);
     const extras = extraQuizDeck.filter((q) => !memory.isResolved(q.id));
-    return [...aiOpen, ...extras];
+    const all = [...aiOpen, ...extras];
+    if (sessionId === "queue") return all;
+    const single = all.find((q) => q.id === sessionId);
+    return single ? [single] : [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 

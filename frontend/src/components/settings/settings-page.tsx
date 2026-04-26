@@ -1,5 +1,8 @@
-import { Bell, Mail, MessageSquare, Volume2, Globe, Palette, Sun, Moon, Monitor } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, Mail, MessageSquare, Volume2, Globe, Palette, Sun, Moon, Monitor, UserRound } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -11,6 +14,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { toast } from "sonner";
 import { useTheme, type Theme } from "@/lib/theme-context";
 import { cn } from "@/lib/utils";
+import { USER_ID_STORAGE_KEY } from "@/components/shell/user-id-gate";
 
 type NotificationPrefs = {
   email: boolean;
@@ -41,6 +45,22 @@ export function SettingsPage() {
     "qontext.settings.language",
     "en",
   );
+  const [userId, setUserId] = useLocalStorage<string>(USER_ID_STORAGE_KEY, "");
+  const [userIdDraft, setUserIdDraft] = useState(userId);
+
+  useEffect(() => {
+    setUserIdDraft(userId);
+  }, [userId]);
+
+  const saveUserId = () => {
+    const v = userIdDraft.trim();
+    if (v.length === 0) {
+      toast.error("User ID cannot be empty");
+      return;
+    }
+    setUserId(v);
+    toast.success("User ID saved");
+  };
 
   const updateNotif = (key: keyof NotificationPrefs, value: boolean) => {
     setNotifications((prev) => ({ ...prev, [key]: value }));
@@ -67,6 +87,42 @@ export function SettingsPage() {
           Tune how Qontext talks to you and which language it speaks.
         </p>
       </header>
+
+      <section className="mb-6 rounded-2xl border border-border bg-card p-6">
+        <div className="mb-5 flex items-center gap-2">
+          <UserRound className="h-4 w-4 text-accent-ink" />
+          <h2 className="text-sm font-medium text-ink">Account</h2>
+        </div>
+        <div className="flex items-end justify-between gap-6">
+          <div className="flex-1">
+            <label
+              htmlFor="settings-user-id"
+              className="block text-sm text-ink"
+            >
+              User ID
+            </label>
+            <p className="mt-1 text-xs text-ink-muted">
+              Identifies you with the backend. Required.
+            </p>
+            <Input
+              id="settings-user-id"
+              className="mt-3 max-w-sm"
+              value={userIdDraft}
+              onChange={(e) => setUserIdDraft(e.target.value)}
+              placeholder="e.g. henri-salzer"
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={saveUserId}
+            disabled={
+              userIdDraft.trim().length === 0 || userIdDraft.trim() === userId
+            }
+          >
+            Save
+          </Button>
+        </div>
+      </section>
 
       <section className="mb-6 rounded-2xl border border-border bg-card p-6">
         <div className="mb-5 flex items-center gap-2">

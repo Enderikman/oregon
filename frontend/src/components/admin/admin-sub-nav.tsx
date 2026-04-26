@@ -10,6 +10,7 @@ interface NavItem {
 const items: NavItem[] = [
   { label: "Overview", path: "/admin", available: true, exact: true },
   { label: "Neural Map", path: "/admin/map", available: true, exact: false },
+  { label: "Memory", path: "/admin/memory", available: true, exact: false },
   { label: "Interviews", path: "/admin/interviews", available: true, exact: false },
   { label: "Conflicts", path: "/admin/conflicts", available: true, exact: false },
 ];
@@ -53,4 +54,3 @@ export function AdminSubNav() {
     </div>
   );
 }
-

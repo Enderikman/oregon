@@ -61,7 +61,9 @@ export function NeuralSidePanel({
           </dd>
         </div>
         <div>
-          <dt className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">Verified</dt>
+          <dt className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">
+            Verified
+          </dt>
           <dd className="mt-0.5 font-mono tabular-nums text-ink-muted">
             {new Date(fact.verifiedAt).toLocaleDateString()}
           </dd>
@@ -70,10 +72,14 @@ export function NeuralSidePanel({
 
       {source && (
         <section className="mt-5">
-          <div className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">Source</div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">
+            Source
+          </div>
           <div className="mt-2 rounded-md border border-border bg-background p-3">
             <div className="text-[12px] text-ink">{source.label}</div>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">"{source.excerpt}"</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-ink-muted">
+              "{source.excerpt}"
+            </p>
           </div>
         </section>
       )}
@@ -118,7 +124,8 @@ export function NeuralSidePanel({
                   to="/admin"
                   className="block rounded-md border border-border bg-background px-3 py-2 text-[12px] text-ink hover:bg-surface-2"
                 >
-                  <span className="font-mono text-[10px] text-ink-soft">{s.id}</span> · {s.topic} ·{" "}
+                  <span className="font-mono text-[10px] text-ink-soft">{s.id}</span>{" "}
+                  · {s.topic} ·{" "}
                   <span className="text-ink-muted">{s.mode}</span>
                 </Link>
               </li>
@@ -143,7 +150,9 @@ export function NeuralSearch({ entities, onSelect, value, onChange }: SearchProp
     if (!value.trim()) return [];
     const q = value.toLowerCase();
     return entities
-      .filter((e) => e.name.toLowerCase().includes(q) || e.type.includes(q))
+      .filter(
+        (e) => e.name.toLowerCase().includes(q) || e.type.includes(q),
+      )
       .slice(0, 6);
   }, [entities, value]);
 
@@ -174,7 +183,9 @@ export function NeuralSearch({ entities, onSelect, value, onChange }: SearchProp
                 className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-ink hover:bg-surface-2"
               >
                 <span className="truncate">{e.name}</span>
-                <span className="font-mono text-[10px] uppercase text-ink-soft">{e.type}</span>
+                <span className="font-mono text-[10px] uppercase text-ink-soft">
+                  {e.type}
+                </span>
               </button>
             </li>
           ))}
@@ -198,7 +209,9 @@ export function NeuralLegend({ className }: LegendProps) {
     <div
       className={`absolute bottom-4 left-4 z-20 rounded-[10px] border border-border bg-surface px-3 py-2 shadow-soft ${className ?? ""}`}
     >
-      <div className="font-mono text-[9px] uppercase tracking-wider text-ink-soft">Edges</div>
+      <div className="font-mono text-[9px] uppercase tracking-wider text-ink-soft">
+        Edges
+      </div>
       <ul className="mt-1 flex gap-3">
         {items.map((it) => (
           <li key={it.label} className="flex items-center gap-1.5 text-[11px] text-ink-muted">

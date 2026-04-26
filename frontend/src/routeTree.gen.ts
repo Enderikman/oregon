@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as QuizIdRouteImport } from './routes/quiz.$id'
 import { Route as InterviewIdRouteImport } from './routes/interview.$id'
+import { Route as AdminMemoryRouteImport } from './routes/admin.memory'
 import { Route as AdminMapRouteImport } from './routes/admin.map'
 import { Route as AdminInterviewsRouteImport } from './routes/admin.interviews'
 import { Route as AdminConflictsRouteImport } from './routes/admin.conflicts'
@@ -57,6 +58,11 @@ const InterviewIdRoute = InterviewIdRouteImport.update({
   path: '/interview/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMemoryRoute = AdminMemoryRouteImport.update({
+  id: '/memory',
+  path: '/memory',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminMapRoute = AdminMapRouteImport.update({
   id: '/map',
   path: '/map',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/admin/conflicts': typeof AdminConflictsRoute
   '/admin/interviews': typeof AdminInterviewsRouteWithChildren
   '/admin/map': typeof AdminMapRoute
+  '/admin/memory': typeof AdminMemoryRoute
   '/interview/$id': typeof InterviewIdRoute
   '/quiz/$id': typeof QuizIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/admin/conflicts': typeof AdminConflictsRoute
   '/admin/map': typeof AdminMapRoute
+  '/admin/memory': typeof AdminMemoryRoute
   '/interview/$id': typeof InterviewIdRoute
   '/quiz/$id': typeof QuizIdRoute
   '/admin': typeof AdminIndexRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/admin/conflicts': typeof AdminConflictsRoute
   '/admin/interviews': typeof AdminInterviewsRouteWithChildren
   '/admin/map': typeof AdminMapRoute
+  '/admin/memory': typeof AdminMemoryRoute
   '/interview/$id': typeof InterviewIdRoute
   '/quiz/$id': typeof QuizIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/admin/conflicts'
     | '/admin/interviews'
     | '/admin/map'
+    | '/admin/memory'
     | '/interview/$id'
     | '/quiz/$id'
     | '/admin/'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/conflicts'
     | '/admin/map'
+    | '/admin/memory'
     | '/interview/$id'
     | '/quiz/$id'
     | '/admin'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/admin/conflicts'
     | '/admin/interviews'
     | '/admin/map'
+    | '/admin/memory'
     | '/interview/$id'
     | '/quiz/$id'
     | '/admin/'
@@ -227,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InterviewIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/memory': {
+      id: '/admin/memory'
+      path: '/memory'
+      fullPath: '/admin/memory'
+      preLoaderRoute: typeof AdminMemoryRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/map': {
       id: '/admin/map'
       path: '/map'
@@ -283,6 +302,7 @@ interface AdminRouteChildren {
   AdminConflictsRoute: typeof AdminConflictsRoute
   AdminInterviewsRoute: typeof AdminInterviewsRouteWithChildren
   AdminMapRoute: typeof AdminMapRoute
+  AdminMemoryRoute: typeof AdminMemoryRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -290,6 +310,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminConflictsRoute: AdminConflictsRoute,
   AdminInterviewsRoute: AdminInterviewsRouteWithChildren,
   AdminMapRoute: AdminMapRoute,
+  AdminMemoryRoute: AdminMemoryRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

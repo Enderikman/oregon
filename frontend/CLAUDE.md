@@ -13,7 +13,7 @@ All data is mocked in `src/lib/mock-data.ts`. There is no backend.
 - **Styling**: Tailwind CSS v4, configured via `@import` and `@theme` in `src/styles.css` (no `tailwind.config.js`). All colors defined as `oklch` semantic tokens.
 - **UI primitives**: shadcn/ui (Radix under the hood) in `src/components/ui/`
 - **Animation**: framer-motion
-- **Graph**: reactflow (used in the Neural Map)
+- **Graph**: react-force-graph (2d + 3d) for the Neural Map; uses three.js. Lazy-loaded behind a mount guard for SSR safety.
 - **State**: React context + `useLocalStorage` hook. No server, no TanStack Query usage yet.
 - **Build/runtime constraints**: Worker SSR — no Node-only packages, no `child_process`, no native binaries.
 
@@ -29,7 +29,7 @@ All data is mocked in `src/lib/mock-data.ts`. There is no backend.
   - `/admin/map` — neural map (reactflow graph of entities and facts)
   - `/admin/interviews` + `/admin/interviews/$id` — interview log and detail
   - `/admin/conflicts` — conflicting facts queue
-  - **Note**: a former `/admin/memory` browser was removed. The underlying memory store stays — only the browser UI is gone. Do not re-add it without an explicit request.
+  - `/admin/memory` — VFS-style memory browser (entity tree → entity detail with facts → backlinks/provenance, interview transcript drawer)
 
 ## Domain model
 

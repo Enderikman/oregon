@@ -1,0 +1,27 @@
+{
+  "_comment": "Add these to the target project's package.json dependencies, then run `npm install` (or bun/pnpm equivalent).",
+  "dependencies": {
+    "react-force-graph-2d": "^1.27.0",
+    "react-force-graph-3d": "^1.27.0",
+    "three": "^0.184.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^0.575.0",
+    "@tanstack/react-router": "^1.168.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "shadcn-ui-components": [
+    "sheet",
+    "scroll-area",
+    "separator",
+    "tooltip",
+    "button",
+    "badge"
+  ],
+  "install_shadcn": "npx shadcn@latest add sheet scroll-area separator tooltip button badge"
+}
