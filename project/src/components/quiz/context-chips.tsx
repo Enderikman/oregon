@@ -127,7 +127,7 @@ export function ContextChips({ data, inlineLimit = 4 }: Props) {
                   </button>
                 </div>
               </div>
-              <div className="flex-1 overflow-auto p-3 sm:p-6 font-mono text-xs sm:text-sm">
+              <div className="flex-1 overflow-auto no-scrollbar p-3 sm:p-6 font-mono text-xs sm:text-sm">
                 <JsonTree value={data} filter={query.trim().toLowerCase()} />
               </div>
             </motion.div>

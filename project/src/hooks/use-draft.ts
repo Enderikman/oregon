@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { aiEndpoints } from "@/lib/quiz-api";
+import { draftFetch, useOpenRouter } from "@/lib/openrouter";
 import type { ChatMsg, Question } from "@/lib/quiz-types";
 
 export function useDraft(question: Question | undefined, history: ChatMsg[] = []) {
@@ -12,6 +13,10 @@ export function useDraft(question: Question | undefined, history: ChatMsg[] = []
       setDrafting(true);
       setError(null);
       try {
+        if (useOpenRouter) {
+          const data = await draftFetch({ question, history, partial });
+          return data.draft.length > 0 ? data.draft : null;
+        }
         const resp = await fetch(aiEndpoints.draft, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

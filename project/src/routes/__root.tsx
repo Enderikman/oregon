@@ -1,4 +1,4 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { TopNav } from "@/components/shell/top-nav";
 import { MemoryProvider } from "@/lib/memory-context";
@@ -69,10 +69,12 @@ function DevResetButton() {
 }
 
 function RootComponent() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const hideNav = pathname.startsWith("/quiz/");
   return (
     <ThemeProvider>
       <MemoryProvider>
-        <TopNav />
+        {!hideNav && <TopNav />}
         <Outlet />
         <Toaster />
         <DevResetButton />

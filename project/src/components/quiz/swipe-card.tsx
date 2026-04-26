@@ -194,7 +194,7 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <div className="grid grid-cols-2 gap-2">
-                  {question.options.map((opt) => (
+                  {question.options.map((opt, i) => (
                     <button
                       key={opt}
                       type="button"
@@ -203,8 +203,13 @@ export function SwipeCard({ question, onDecide, onClarify, isTop, depth, easy = 
                         e.stopPropagation();
                         onDecide(opt);
                       }}
-                      className="px-4 py-3 rounded-xl border border-border bg-secondary/60 hover:bg-accent active:scale-[0.98] transition text-sm font-medium text-foreground"
+                      className="relative px-4 py-3 rounded-xl border border-border bg-secondary/60 hover:bg-accent active:scale-[0.98] transition text-sm font-medium text-foreground"
                     >
+                      {!easy && i < 9 && (
+                        <span className="absolute top-1 right-1.5 text-[9px] font-mono text-muted-foreground/40 tabular-nums">
+                          {i + 1}
+                        </span>
+                      )}
                       {opt}
                     </button>
                   ))}

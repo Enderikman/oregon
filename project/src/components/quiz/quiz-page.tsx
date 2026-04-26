@@ -3,32 +3,56 @@ import { Link } from "@tanstack/react-router";
 import { AnimatePresence } from "framer-motion";
 import { Undo2, X } from "lucide-react";
 import finaleLandscape from "@/assets/finale-landscape.jpg";
+import { ClarifyStoreProvider, useClarifyMessages, useSharedClarify } from "@/hooks/use-clarify";
 import { useDeck } from "@/hooks/use-deck";
 import { useQuizKeyboard } from "@/hooks/use-quiz-keyboard";
 import { useUIMode } from "@/hooks/use-ui-mode";
 import { useQuizSession } from "@/lib/quiz-api";
-import type { Decision } from "@/lib/quiz-types";
+import type { Decision, Question } from "@/lib/quiz-types";
 import { CardStack } from "./card-stack";
 import { ProgressBar } from "./progress-bar";
 import { EndScreen } from "./end-screen";
 import { ModeSwitch } from "./mode-switch";
-import { ThemeToggle } from "./theme-toggle";
 import { EasyActionBar } from "./easy-action-bar";
 import { AIWindow } from "./ai-window";
 import { FollowupPrompt } from "./followup-prompt";
+import {
+  ContextSummaryProvider,
+  ContextSummaryRail,
+  useContextSummaryComponent,
+} from "./context-summaries";
 
 interface Props {
   sessionId: string;
 }
 
 export function QuizPage({ sessionId }: Props) {
-  const { questions, loading, error, submitDecision, finalizeSession } =
-    useQuizSession(sessionId);
+  return (
+    <ClarifyStoreProvider>
+      <ContextSummaryProvider Component={ContextSummaryRail}>
+        <QuizPageInner sessionId={sessionId} />
+      </ContextSummaryProvider>
+    </ClarifyStoreProvider>
+  );
+}
+
+function CurrentSummary({ question }: { question: Question }) {
+  const Summary = useContextSummaryComponent();
+  const messages = useClarifyMessages(question.id);
+  const { loading } = useSharedClarify(question);
+  if (!Summary) return null;
+  return <Summary messages={messages} loading={loading} />;
+}
+
+function QuizPageInner({ sessionId }: Props) {
+  const { questions, loading, error, submitDecision, finalizeSession } = useQuizSession(sessionId);
 
   const deck = useMemo(() => questions, [questions]);
   const storageKey = `qontext.quiz.deck.${sessionId}`;
-  const { current, upcoming, finished, index, total, history, decide, undo, reset } =
-    useDeck(deck, storageKey);
+  const { current, upcoming, finished, index, total, history, decide, undo, reset } = useDeck(
+    deck,
+    storageKey,
+  );
 
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<Decision | null>(null);
@@ -51,8 +75,7 @@ export function QuizPage({ sessionId }: Props) {
 
   const remaining = total - index;
   const avgMs = history.length
-    ? history.slice(-5).reduce((a, h) => a + h.durationMs, 0) /
-      Math.min(5, history.length)
+    ? history.slice(-5).reduce((a, h) => a + h.durationMs, 0) / Math.min(5, history.length)
     : 3500;
   const etaSec = Math.max(1, Math.round((avgMs * remaining) / 1000));
 
@@ -101,6 +124,24 @@ export function QuizPage({ sessionId }: Props) {
     },
     !finished && !easy,
   );
+
+  useEffect(() => {
+    if (easy || finished || !current || current.type !== "choice") return;
+    const opts = current.options;
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (clarifyOpen || pendingDecision) return;
+      if (e.key.length !== 1) return;
+      const n = Number(e.key);
+      if (Number.isInteger(n) && n >= 1 && n <= Math.min(opts.length, 9)) {
+        e.preventDefault();
+        handleDecide(opts[n - 1]);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [easy, finished, current, clarifyOpen, pendingDecision]);
 
   if (loading) {
     return (
@@ -177,7 +218,6 @@ export function QuizPage({ sessionId }: Props) {
           </div>
           <div className="flex items-center gap-1">
             <ModeSwitch mode={mode} onToggle={toggleMode} />
-            <ThemeToggle />
             <button
               onClick={undo}
               disabled={history.length === 0}
@@ -232,7 +272,10 @@ export function QuizPage({ sessionId }: Props) {
         </p>
       </footer>
 
-      {current && <AIWindow question={current} open={clarifyOpen} onClose={() => setClarifyOpen(false)} />}
+      {current && <CurrentSummary question={current} />}
+      {current && (
+        <AIWindow question={current} open={clarifyOpen} onClose={() => setClarifyOpen(false)} />
+      )}
 
       <AnimatePresence>
         {current && pendingDecision && (
