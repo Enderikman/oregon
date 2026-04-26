@@ -1,0 +1,103 @@
+# Mapper: EnterpriseBench → ontology
+# Defines how each source file maps to entity types and communications.
+
+base_path: EnterpriseBench/
+
+entities:
+
+  - source: Human_Resource_Management/Employees/employees.json
+    entity_type: Person
+    id: { field: emp_id }
+    frontmatter:
+      name: { field: Name }
+      department: { field: category }
+      is_external: { literal: false }
+      reports_to: { field: reports_to }
+    related_entities:
+      - { field: reports_to }
+      - { field: reportees, type: list }
+
+  - source: Business_and_Management/clients.json
+    entity_type: Organization
+    id: { field: business_name, transform: slug }
+    frontmatter:
+      name: { field: business_name }
+      relationship: { literal: client }
+    related_entities:
+      - { field: business_representative_employee }
+
+  - source: Business_and_Management/vendors.json
+    entity_type: Organization
+    id: { field: business_name, transform: slug }
+    frontmatter:
+      name: { field: business_name }
+      relationship: { literal: vendor }
+    related_entities:
+      - { field: management_representative_employee }
+
+  - source: Customer_Relation_Management/products.json
+    entity_type: Product
+    id: { field: product_id }
+    frontmatter:
+      name: { field: product_name }
+    related_entities: []
+
+  - source: IT_Service_Management/it_tickets.json
+    entity_type: Ticket
+    id: { field: id, transform: str }
+    frontmatter: {}
+    related_entities:
+      - { field: emp_id }
+      - { field: raised_by_emp_id }
+
+  - source: Workspace/GitHub/GitHub.json
+    entity_type: Repository
+    id: { field: repo_name, transform: slug }
+    frontmatter:
+      name: { field: repo_name }
+    related_entities:
+      - { field: emp_id }
+
+  - source: Inazuma_Overflow/overflow.json
+    entity_type: Knowledge
+    id: { field: Id, transform: "prefix:overflow-" }
+    frontmatter:
+      title: { field: Title }
+    related_entities:
+      - { field: employee_id }
+
+  - source: Enterprise Social Platform/posts.json
+    entity_type: Knowledge
+    id: { field: post_id, fallback: id, transform: "prefix:post-" }
+    frontmatter:
+      title: { field: title, fallback: Title }
+    related_entities:
+      - { field: emp_id }
+
+communications:
+
+  - source: Enterprise_mail_system/emails.json
+    type: email
+    persist: true
+    id: { field: thread_id }
+    date: { field: date }
+    participants:
+      - { field: sender_emp_id }
+      - { field: recipient_emp_id }
+
+  - source: Collaboration_tools/conversations.json
+    type: conversation
+    persist: true
+    id: { field: conversation_id }
+    date: { field: date }
+    participants:
+      - { field: sender_emp_id }
+      - { field: recipient_emp_id }
+
+  - source: Customer_Relation_Management/Customer Support/customer_support_chats.json
+    type: support_chat
+    persist: true
+    id: { field: chat_id }
+    date: { field: interaction_date }
+    participants:
+      - { field: emp_id }
