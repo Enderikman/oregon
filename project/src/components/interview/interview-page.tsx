@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import { useMemoryStore } from "@/lib/memory-context";
-import { isSpeechSupported, startDictation } from "@/lib/speech";
+import { isSpeechSupported, speak, startDictation } from "@/lib/speech";
 import type { AIQuestion } from "@/lib/types";
 import { QuestionProgress } from "./question-progress";
 import { VoiceStage } from "./voice-stage";
@@ -72,9 +72,8 @@ export function InterviewPage({ sessionId }: Props) {
       clearTimeout(advanceTimer.current);
       advanceTimer.current = null;
     }
-    if (typeof window !== "undefined") {
-      try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
-    }
+    // Note: HTTP-based TTS has no equivalent of speechSynthesis.cancel();
+    // playback runs to completion. Bot-interrupt is a no-op for now.
   };
 
   const appendAgent = (text: string) =>
@@ -94,23 +93,15 @@ export function InterviewPage({ sessionId }: Props) {
     setPhase("speaking");
     appendAgent(q.question);
 
-    let spoke = false;
-    if (typeof window !== "undefined" && window.speechSynthesis) {
+    void (async () => {
       try {
-        const u = new SpeechSynthesisUtterance(q.question);
-        u.rate = 1;
-        u.pitch = 1;
-        u.onend = () => beginListening(q);
-        window.speechSynthesis.speak(u);
-        spoke = true;
+        await speak(q.question);
+        beginListening(q);
       } catch {
-        spoke = false;
+        // Fallback: pretend we asked, then move to listening
+        advanceTimer.current = setTimeout(() => beginListening(q), 1200);
       }
-    }
-    if (!spoke) {
-      // Fallback: pretend we asked, then move to listening
-      advanceTimer.current = setTimeout(() => beginListening(q), 1200);
-    }
+    })();
   };
 
   const beginListening = (q: AIQuestion) => {
