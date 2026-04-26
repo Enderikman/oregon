@@ -52,6 +52,7 @@ export function InterviewPage({ sessionId }: Props) {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interim, setInterim] = useState("");
   const [pendingAnswer, setPendingAnswer] = useState<string>("");
+  const [pendingAnswerEdited, setPendingAnswerEdited] = useState<boolean>(false);
   const [resolved, setResolved] = useState<ResolvedPair[]>([]);
   const [skipped, setSkipped] = useState<AIQuestion[]>([]);
   const startedAtRef = useRef<string>(new Date().toISOString());
@@ -131,6 +132,7 @@ export function InterviewPage({ sessionId }: Props) {
     stopAll();
     setInterim("");
     setPendingAnswer(choice);
+    setPendingAnswerEdited(false);
     setPhase("confirming");
   };
 
@@ -142,11 +144,18 @@ export function InterviewPage({ sessionId }: Props) {
     resolveQuestion(current.id, choice);
     setResolved((prev) => [...prev, { question: current, answer: choice }]);
     setPendingAnswer("");
+    setPendingAnswerEdited(false);
     advanceTimer.current = setTimeout(() => goNext(), 600);
+  };
+
+  const handleEditCommit = (text: string) => {
+    setPendingAnswer(text);
+    setPendingAnswerEdited(true);
   };
 
   const handleEdit = () => {
     setPendingAnswer("");
+    setPendingAnswerEdited(false);
     if (current) {
       askCurrent(current);
     }
@@ -154,6 +163,7 @@ export function InterviewPage({ sessionId }: Props) {
 
   const handleDismiss = () => {
     setPendingAnswer("");
+    setPendingAnswerEdited(false);
     if (current) beginListening(current);
   };
 
@@ -381,8 +391,10 @@ export function InterviewPage({ sessionId }: Props) {
               q={current}
               phase={phase}
               pendingAnswer={pendingAnswer}
+              pendingAnswerEdited={pendingAnswerEdited}
               onConfirm={handleConfirm}
               onEdit={handleEdit}
+              onEditCommit={handleEditCommit}
               onDismiss={handleDismiss}
               onCandidate={handleResolve}
             />

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Mic, X } from "lucide-react";
 import type { AIQuestion } from "@/lib/types";
+import { EditableTranscript } from "./editable-transcript";
 
 type Phase = "idle" | "speaking" | "listening" | "confirming" | "processing" | "done";
 
@@ -8,8 +9,10 @@ interface Props {
   q: AIQuestion;
   phase: Phase;
   pendingAnswer?: string;
+  pendingAnswerEdited?: boolean;
   onConfirm?: () => void;
   onEdit?: () => void;
+  onEditCommit?: (text: string) => void;
   onDismiss?: () => void;
   onCandidate: (choice: string) => void;
 }
@@ -18,8 +21,10 @@ export function VoiceStage({
   q,
   phase,
   pendingAnswer,
+  pendingAnswerEdited,
   onConfirm,
   onEdit,
+  onEditCommit,
   onDismiss,
   onCandidate,
 }: Props) {
@@ -66,18 +71,11 @@ export function VoiceStage({
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="mt-10 w-full max-w-[440px] rounded-[20px] border border-border bg-surface p-5 text-left shadow-soft"
           >
-            <div className="flex items-center gap-2">
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: "var(--accent)" }}
-              />
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
-                What I understood
-              </span>
-            </div>
-            <p className="mt-3 text-[15px] leading-snug text-ink">
-              {pendingAnswer}
-            </p>
+            <EditableTranscript
+              value={pendingAnswer ?? ""}
+              edited={pendingAnswerEdited}
+              onCommit={(text) => onEditCommit?.(text)}
+            />
 
             <div className="mt-5 flex items-center gap-2">
               <button
@@ -96,7 +94,7 @@ export function VoiceStage({
                 onClick={onEdit}
                 className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface-2 px-4 py-2.5 text-[13px] text-ink hover:bg-surface"
               >
-                <Pencil size={13} /> Edit
+                <Mic size={13} /> Re-record
               </button>
               <button
                 onClick={onDismiss}
