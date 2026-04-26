@@ -15,3 +15,6 @@ archive/
 
 # Logs
 *.log
+
+# Node
+node_modules/
