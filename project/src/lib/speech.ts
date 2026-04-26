@@ -146,27 +146,85 @@ export function startDictation(
   let cleanupAudio: (() => void) | null = null;
   let socket: WebSocket | null = null;
   let interimBuffer = "";
+  let finalEmitted = false;
 
   const wsUrl = `${base.replace(/^http/, "ws")}/api/stt`;
 
-  const teardown: DictationCleanup = () => {
-    if (stopped) return;
-    stopped = true;
-    try {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "end" }));
-      }
-    } catch {
-      /* ignore */
-    }
+  // How long to wait after sending {type:"end"} for the bridge to flush a
+  // final:true transcript before we close the socket. Short utterances
+  // ("yes", "no") need this — the user releases the mic before Gradium
+  // has emitted any text events, so the final arrives a few hundred ms
+  // after our `end`. If we close the WS first, the message is lost.
+  const FLUSH_GRACE_MS = 500;
+
+  const closeSocket = () => {
     try {
       socket?.close();
     } catch {
       /* ignore */
     }
     socket = null;
+  };
+
+  const teardown: DictationCleanup = () => {
+    if (stopped) return;
+    stopped = true;
+
+    // Stop the mic immediately — we want no further audio frames going
+    // upstream while we wait for the final flush.
     cleanupAudio?.();
     cleanupAudio = null;
+
+    const ws = socket;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      closeSocket();
+      return;
+    }
+
+    // Send {type:"end"} and then wait briefly for the bridge to send a
+    // final:true transcript. Once we get it (or the timeout fires), we
+    // close. The onmessage handler still runs during this window because
+    // the socket is open — it'll call onFinal as usual.
+    try {
+      ws.send(JSON.stringify({ type: "end" }));
+    } catch {
+      closeSocket();
+      return;
+    }
+
+    let closed = false;
+    const closeOnce = () => {
+      if (closed) return;
+      closed = true;
+      closeSocket();
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      // Last-chance: if no final:true came back in time AND we never
+      // emitted via onmessage, promote whatever interim we have.
+      if (!finalEmitted) {
+        const pending = interimBuffer.trim();
+        interimBuffer = "";
+        if (pending) {
+          finalEmitted = true;
+          onFinal(pending);
+        }
+      }
+      closeOnce();
+    }, FLUSH_GRACE_MS);
+
+    // If the socket is closed by the server (after it emitted final),
+    // the existing onclose handler runs — clear the timer and we're done.
+    const prevOnClose = ws.onclose;
+    ws.onclose = (ev) => {
+      window.clearTimeout(timeoutId);
+      try {
+        prevOnClose?.call(ws, ev);
+      } catch {
+        /* ignore */
+      }
+      closeOnce();
+    };
   };
 
   (async () => {
@@ -199,7 +257,10 @@ export function startDictation(
           if (msg.final) {
             const finalText = (text || interimBuffer).trim();
             interimBuffer = "";
-            if (finalText) onFinal(finalText);
+            if (finalText && !finalEmitted) {
+              finalEmitted = true;
+              onFinal(finalText);
+            }
           } else if (text) {
             interimBuffer = text.replace(/\s+/g, " ").trimStart();
             onInterim(interimBuffer);
@@ -212,10 +273,16 @@ export function startDictation(
       };
 
       socket.onclose = () => {
-        // If we still have buffered interim text on close, promote it.
+        // If we still have buffered interim text on close, promote it —
+        // covers cases where the server tore down without sending final
+        // (e.g. abrupt upstream disconnect).
+        if (finalEmitted) return;
         const pending = interimBuffer.trim();
         interimBuffer = "";
-        if (pending) onFinal(pending);
+        if (pending) {
+          finalEmitted = true;
+          onFinal(pending);
+        }
       };
 
       await opened;
