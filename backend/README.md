@@ -32,8 +32,20 @@ EMBED_MODEL=gemini-embedding-001                      # default
 
 ```bash
 source .venv/bin/activate
-python -m uvicorn src.server:app --host 0.0.0.0 --port 8000 --reload
+./startup.sh
 ```
+
+`startup.sh` extracts `../data/archive.tar.xz` into `../data/` if `OUTPUT_DIR` is empty, then launches uvicorn.
+
+Env vars:
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `DATA_ARCHIVE` | `../data/archive.tar.xz` | tarball to extract on first run |
+| `DATA_EXTRACT_DIR` | `../data` | extract target |
+| `OUTPUT_DIR` | `../data/EnterpriseBench` | ingested-data dir; skip extract if non-empty |
+| `HOST` / `PORT` | `0.0.0.0` / `8000` | uvicorn bind |
+| `RELOAD` | unset | set `true` for `--reload` |
 
 Or from the repo root:
 

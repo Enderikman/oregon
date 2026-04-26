@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from src.query.main import query as run_query
 from src.ingest.reverse_index import WIKILINK_PATTERN
 
-OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "output/EnterpriseBench"))
+OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "output"))
 ONTOLOGY_PATH = os.environ.get("ONTOLOGY_PATH", "src/ingest/ontology.yaml")
 INGEST_DATA_DIR = os.environ.get("INGEST_DATA_DIR")
 INGEST_MAPPER_PATH = os.environ.get("INGEST_MAPPER_PATH")

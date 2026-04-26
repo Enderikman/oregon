@@ -10,8 +10,9 @@ services:
       - EMBED_MODEL=${EMBED_MODEL:-gemini-embedding-001}
       - EMBED_ENDPOINT=${EMBED_ENDPOINT:-}
       - INGEST_DATA_DIR=${INGEST_DATA_DIR:-/dataset/EnterpriseBench}
-      - OUTPUT_DIR=${OUTPUT_DIR:-/data/EnterpriseBench}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/app/backend/output}
       - INGEST_ON_STARTUP=${INGEST_ON_STARTUP:-true}
+      - DATA_ARCHIVE=${DATA_ARCHIVE:-/data/archive.tar.xz}
     volumes:
       - ./data:/data
       - ./dataset:/dataset:ro
