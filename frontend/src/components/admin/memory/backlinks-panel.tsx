@@ -8,8 +8,8 @@ interface Props {
 export function BacklinksPanel({ backlinks, onSelectEntity }: Props) {
   return (
     <aside>
-      <section className="rounded-[14px] border border-border bg-surface p-4 shadow-soft">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">
+      <section className="flex max-h-[calc(100vh-4rem)] flex-col rounded-[14px] border border-border bg-surface p-4 shadow-soft">
+        <div className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-ink-soft">
           Mentioned by ({backlinks.length})
         </div>
         {backlinks.length === 0 ? (
@@ -17,7 +17,7 @@ export function BacklinksPanel({ backlinks, onSelectEntity }: Props) {
             Nothing links here yet.
           </p>
         ) : (
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-2 space-y-1 overflow-y-auto">
             {backlinks.map((b) => (
               <li key={b.id}>
                 <button
