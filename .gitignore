@@ -1,0 +1,17 @@
+# Archived prototypes / scratch
+archive/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
