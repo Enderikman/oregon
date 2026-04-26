@@ -1,5 +1,7 @@
+import os
 import re
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from textwrap import dedent
 
@@ -10,7 +12,48 @@ from pydantic import BaseModel
 from src.query.main import query as run_query
 from src.ingest.reverse_index import WIKILINK_PATTERN
 
-app = FastAPI(title="Oregon API")
+OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "output/EnterpriseBench"))
+ONTOLOGY_PATH = os.environ.get("ONTOLOGY_PATH", "src/ingest/ontology.yaml")
+INGEST_DATA_DIR = os.environ.get("INGEST_DATA_DIR")
+INGEST_ON_STARTUP = os.environ.get("INGEST_ON_STARTUP", "true").lower() in ("1", "true", "yes")
+
+
+def _has_ingested_data(output_dir: Path) -> bool:
+    if not output_dir.exists() or not output_dir.is_dir():
+        return False
+    return any(output_dir.iterdir())
+
+
+def _maybe_ingest_on_startup():
+    if not INGEST_ON_STARTUP:
+        print("[startup] INGEST_ON_STARTUP=false — skipping")
+        return
+    if _has_ingested_data(OUTPUT_DIR):
+        print(f"[startup] Data already present at {OUTPUT_DIR} — skipping ingest")
+        return
+    if not INGEST_DATA_DIR:
+        print("[startup] INGEST_DATA_DIR not set — skipping ingest (frontend mocks will be used)")
+        return
+    data_dir = Path(INGEST_DATA_DIR)
+    if not data_dir.exists() or not data_dir.is_dir():
+        print(f"[startup] INGEST_DATA_DIR={data_dir} not found — skipping")
+        return
+    print(f"[startup] Ingesting {data_dir} → {OUTPUT_DIR} ...")
+    from src.ingest.main import run as run_ingest
+    run_ingest(str(data_dir), str(OUTPUT_DIR))
+    print("[startup] Ingest done")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        _maybe_ingest_on_startup()
+    except Exception as e:
+        print(f"[startup] Ingest failed: {e}")
+    yield
+
+
+app = FastAPI(title="Oregon API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,8 +61,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OUTPUT_DIR = Path("output/EnterpriseBench")
-ONTOLOGY_PATH = "src/ingest/ontology.yaml"
+
+@app.get("/health")
+def health():
+    return {
+        "ok": True,
+        "outputDir": str(OUTPUT_DIR),
+        "hasData": _has_ingested_data(OUTPUT_DIR),
+    }
 
 # ── Chat ────────────────────────────────────────────────────────────────
 

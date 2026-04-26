@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: oregon-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - EMBED_ENDPOINT=${EMBED_ENDPOINT:-}
+      - EMBED_MODEL=${EMBED_MODEL:-}
+      - INGEST_DATA_DIR=${INGEST_DATA_DIR:-/dataset/EnterpriseBench}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/data/EnterpriseBench}
+      - INGEST_ON_STARTUP=${INGEST_ON_STARTUP:-true}
+    volumes:
+      - ./data:/data
+      - ./dataset:/dataset:ro
+    networks:
+      - oregon-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: oregon-frontend
+    ports:
+      - "4321:4321"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:3000}
+      - VITE_OPENROUTER_API_KEY=${VITE_OPENROUTER_API_KEY:-}
+      - VITE_OPENROUTER_MODEL=${VITE_OPENROUTER_MODEL:-openai/gpt-4o-mini}
+    depends_on:
+      - backend
+    networks:
+      - oregon-net
+
+networks:
+  oregon-net:
+    driver: bridge

@@ -1,0 +1,3 @@
+[submodule "caffeinate"]
+	path = caffeinate
+	url = git@github.com:devmaxde/caffeinate.git

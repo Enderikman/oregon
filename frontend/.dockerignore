@@ -1,0 +1,9 @@
+node_modules
+dist
+.output
+.cache
+.wrangler
+.vite
+.env
+.env.local
+*.log
