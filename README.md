@@ -41,3 +41,9 @@ On first boot the backend ingests the EnterpriseBench dataset into `./data/` —
 | Frontend | [http://localhost:4321](http://localhost:4321) |
 | Backend API | [http://localhost:3000](http://localhost:3000) |
 | Voice Agent | [http://localhost:8001](http://localhost:8001) |
+
+
+
+<p align="center">
+  <img src="assets/print.png" alt="Oregon architecture — sources → entity decomposition → knowledge graph → hybrid search → answer" width="100%"/>
+</p>
